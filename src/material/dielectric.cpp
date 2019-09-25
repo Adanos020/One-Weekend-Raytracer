@@ -3,9 +3,9 @@
 #include <hittable.hpp>
 #include <random.hpp>
 
-dielectric::dielectric(const float refractive_index, const color attenuation)
+dielectric::dielectric(const color& albedo, const float refractive_index)
     : refractive_index(refractive_index)
-    , attenuation(attenuation)
+    , albedo(albedo)
 {
 }
 
@@ -40,9 +40,9 @@ scattering_opt dielectric::scatter(const ray& r, const hit_record& hit) const
 
     if (random_chance(reflect_probability))
     {
-        return scattering{ attenuation, ray{ hit.point, reflected } };
+        return scattering{ albedo, ray{ hit.point, reflected } };
     }
-    return scattering{ attenuation, ray{ hit.point, refracted } };
+    return scattering{ albedo, ray{ hit.point, refracted } };
 }
 
 float dielectric::schlick(const float cosine, const float refractive_index)

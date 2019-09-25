@@ -17,8 +17,7 @@ public:
         this->hittables.push_back(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
-    virtual hit_record_opt hit(
-        const struct ray&, const float t_min, const float t_max) const override;
+    virtual hit_record_opt hit(const struct ray&, const float t_min, const float t_max) const override;
 
 private:
     std::vector<unique_hittable> hittables;

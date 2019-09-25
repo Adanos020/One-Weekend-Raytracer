@@ -81,7 +81,7 @@ int main()
 {
     const position camera_position = { -0.3f, 0.75f, 3.f };
     const position look_at = { 0.f, -0.25f, 0.5f };
-    const camera cam = { {
+    const camera cam = camera_create_info{
         camera_position,
         look_at,
         axis{ 0.f, 1.f, 0.f },
@@ -89,14 +89,14 @@ int main()
         float(IMAGE_WIDTH) / float(IMAGE_HEIGHT),
         0.1f,
         glm::distance(camera_position, look_at)
-    } };
+    };
 
     world w;
     w.spawn_object<sphere>(position{ 0.f, 0.25f, -0.75f }, 0.75f, std::make_unique<lambertian>(color{ 0.8f, 0.3f, 0.3f }));
     w.spawn_object<sphere>(position{ 0.f, -50.5f, 0.f }, 50.f, std::make_unique<lambertian>(color{ 0.8f, 0.8f, 0.f }));
-    w.spawn_object<sphere>(position{ 0.f, -0.25f, 0.5f }, 0.25f, std::make_unique<dielectric>(1.5f, color{ 1.f, 1.f, 1.f }));
-    w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, 0.5f, std::make_unique<dielectric>(1.5f, color{ 1.f, 0.6f, 0.6f }));
-    w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, -0.45f, std::make_unique<dielectric>(1.5f, color{ 1.f, 1.f, 1.f }));
+    w.spawn_object<sphere>(position{ 0.f, -0.25f, 0.5f }, 0.25f, std::make_unique<dielectric>(color{ 1.f, 1.f, 1.f }, 1.5f));
+    w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, 0.5f, std::make_unique<dielectric>(color{ 1.f, 0.6f, 0.6f }, 1.5f));
+    w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, -0.45f, std::make_unique<dielectric>(color{ 1.f, 1.f, 1.f }, 1.5f));
     w.spawn_object<sphere>(position{ 0.75f, 0.f, 0.25f }, 0.5f, std::make_unique<metal>(color{ 0.8f, 0.6f, 0.2f }, 0.05f));
 
     const std::vector<color> image = render_image(w, cam);

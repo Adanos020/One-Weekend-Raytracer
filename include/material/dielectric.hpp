@@ -1,17 +1,17 @@
 #pragma once
 
 #include <material.hpp>
+#include <types.hpp>
 
 class dielectric : public material
 {
 public:
-    dielectric(const float refractive_index, const color attenuation);
-
+    dielectric(const color& albedo, const float refractive_index);
     virtual scattering_opt scatter(const ray&, const struct hit_record&) const override;
 
 public:
     float refractive_index;
-    color attenuation;
+    color albedo;
 
 private:
     static float schlick(float cosine, float refractive_index);
