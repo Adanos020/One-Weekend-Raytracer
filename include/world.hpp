@@ -10,6 +10,8 @@
 class world : public hittable
 {
 public:
+    static world random_world_balls();
+
     template<class T, typename... Args>
     void spawn_object(Args... args)
     {

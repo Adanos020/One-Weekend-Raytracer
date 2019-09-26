@@ -17,6 +17,7 @@ using scattering_opt = std::optional<scattering>;
 class material
 {
 public:
+    virtual ~material() = default;
     virtual scattering_opt scatter(const ray&, const struct hit_record&) const = 0;
 };
 

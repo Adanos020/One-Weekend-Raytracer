@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <random>
+#include <type_traits>
 
 static bool random_chance(const float probability)
 {
@@ -13,12 +14,29 @@ static bool random_chance(const float probability)
     return distribution(rng);
 }
 
-static float random_uniform(const float min, const float max)
+template <typename T>
+static auto random_uniform(const T min = T(0), const T max = T(1))
 {
+    static_assert(std::is_arithmetic_v<T>);
+
     static const auto seed = uint32_t(std::chrono::system_clock::now().time_since_epoch().count());
     static std::default_random_engine rng{ seed };
-    std::uniform_real_distribution<float> distribution{ min, max };
-    return distribution(rng);
+
+    if constexpr (std::is_integral_v<T>)
+    {
+        std::uniform_int_distribution<T> distribution{ min, max };
+        return distribution(rng);
+    }
+    else if constexpr (std::is_floating_point_v<T>)
+    {
+        std::uniform_real_distribution<T> distribution{ min, max };
+        return distribution(rng);
+    }
+}
+
+static color random_color()
+{
+    return color{ random_uniform(0.f, 1.f), random_uniform(0.f, 1.f), random_uniform(0.f, 1.f) };
 }
 
 static displacement random_direction()
@@ -35,11 +53,11 @@ static displacement random_direction()
     }
 }
 
-static displacement random_in_unit_disk()
+static displacement random_in_unit_disk(const axis& ax = { 0.f, 0.f, 1.f })
 {
     while (true)
     {
-        if (const displacement dir = { random_uniform(-1.f, 1.f), random_uniform(-1.f, 1.f), 0.f };
+        if (const displacement dir = (axis{ 1.f } -ax) * random_direction();
             glm::dot(dir, dir) < 1.f)
         {
             return dir;
