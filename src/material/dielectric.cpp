@@ -1,7 +1,7 @@
 #include <material/dielectric.hpp>
 
 #include <hittable.hpp>
-#include <random.hpp>
+#include <util/random.hpp>
 
 dielectric::dielectric(const color& albedo, const float refractive_index)
     : refractive_index(refractive_index)
@@ -14,22 +14,16 @@ scattering_opt dielectric::scatter(const ray& r, const hit_record& hit) const
     const float direction_dot_normal = glm::dot(r.direction, hit.normal);
     const float direction_length = glm::length(r.direction);
 
-    displacement outward_normal;
-    float eta;
-    float cosine;
-
-    if (direction_dot_normal > 0.f)
+    const auto [outward_normal, eta, cosine] = [&]
     {
-        outward_normal = -hit.normal;
-        eta = this->refractive_index;
-        cosine = this->refractive_index * direction_dot_normal / direction_length;
-    }
-    else
-    {
-        outward_normal = hit.normal;
-        eta = 1.f / this->refractive_index;
-        cosine = -direction_dot_normal / direction_length;
-    }
+        if (direction_dot_normal > 0.f)
+        {
+            return std::make_tuple(-hit.normal, this->refractive_index,
+                this->refractive_index * direction_dot_normal / direction_length);
+        }
+        return std::make_tuple(hit.normal, 1.f / this->refractive_index,
+            -direction_dot_normal / direction_length);
+    }();
 
     const displacement refracted = glm::refract(glm::normalize(r.direction), outward_normal, eta);
     const displacement reflected = glm::reflect(r.direction, hit.normal);
@@ -47,7 +41,6 @@ scattering_opt dielectric::scatter(const ray& r, const hit_record& hit) const
 
 float dielectric::schlick(const float cosine, const float refractive_index)
 {
-    float r0 = (1 - refractive_index) / (1 + refractive_index);
-    r0 *= r0;
+    const float r0 = glm::pow((1 - refractive_index) / (1 + refractive_index), 2);
     return r0 + (1 - r0) * glm::pow(1 - cosine, 5);
 }

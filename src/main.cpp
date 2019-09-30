@@ -2,10 +2,10 @@
 #include <material/dielectric.hpp>
 #include <material/lambertian.hpp>
 #include <material/metal.hpp>
-#include <random.hpp>
+#include <util/random.hpp>
 #include <ray.hpp>
 #include <sphere.hpp>
-#include <types.hpp>
+#include <util/types.hpp>
 #include <world.hpp>
 
 #include <fstream>

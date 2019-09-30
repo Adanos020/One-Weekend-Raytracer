@@ -1,7 +1,7 @@
 #pragma once
 
 #include <material.hpp>
-#include <types.hpp>
+#include <util/types.hpp>
 
 class metal : public material
 {

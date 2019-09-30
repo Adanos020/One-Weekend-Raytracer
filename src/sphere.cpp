@@ -9,7 +9,7 @@ sphere::sphere(const position& center, const float radius, unique_material&& mat
 {
 }
 
-hit_record_opt sphere::hit(const ray& r, const float t_min, const float t_max) const
+hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
 {
     const displacement oc = r.origin - this->center;
     const float a = glm::dot(r.direction, r.direction);
@@ -19,16 +19,24 @@ hit_record_opt sphere::hit(const ray& r, const float t_min, const float t_max) c
 
     if (discriminant > 0.f)
     {
-        if (const float root_1 = (-b - glm::sqrt(discriminant)) / a; root_1 < t_max && root_1 > t_min)
+        if (const float root_1 = (-b - glm::sqrt(discriminant)) / a; root_1 < t.max && root_1 > t.min)
         {
             const position point = r.point_at_parameter(root_1);
             return hit_record{ root_1, point, (point - this->center) / radius, this->mat.get() };
         }
-        if (const float root_2 = (-b + glm::sqrt(discriminant)) / a; root_2 < t_max && root_2 > t_min)
+        if (const float root_2 = (-b + glm::sqrt(discriminant)) / a; root_2 < t.max && root_2 > t.min)
         {
             const position point = r.point_at_parameter(root_2);
             return hit_record{ root_2, point, (point - this->center) / radius, this->mat.get() };
         }
     }
     return {};
+}
+
+axis_aligned_bounding_box_opt sphere::bounding_box(const min_max<float> t) const
+{
+    return axis_aligned_bounding_box{
+        position{ this->center + displacement{ this->radius } },
+        position{ this->center - displacement{ this->radius } }
+    };
 }

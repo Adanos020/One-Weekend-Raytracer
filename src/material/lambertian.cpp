@@ -1,7 +1,7 @@
 #include <material/lambertian.hpp>
 
 #include <hittable.hpp>
-#include <random.hpp>
+#include <util/random.hpp>
 
 lambertian::lambertian(const color& albedo)
     : albedo(albedo)

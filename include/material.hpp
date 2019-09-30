@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ray.hpp>
-#include <types.hpp>
+#include <util/types.hpp>
 
 #include <memory>
 #include <optional>

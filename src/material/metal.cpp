@@ -1,7 +1,7 @@
 #include <material/metal.hpp>
 
 #include <hittable.hpp>
-#include <random.hpp>
+#include <util/random.hpp>
 
 metal::metal(const color& albedo, const float fuzz)
     : albedo(albedo)

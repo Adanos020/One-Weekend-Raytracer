@@ -1,6 +1,6 @@
 #pragma once
 
-#include <types.hpp>
+#include <util/types.hpp>
 
 struct camera_create_info
 {

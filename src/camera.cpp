@@ -1,6 +1,6 @@
 #include <camera.hpp>
 
-#include <random.hpp>
+#include <util/random.hpp>
 #include <ray.hpp>
 
 camera::camera(const camera_create_info& info)

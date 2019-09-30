@@ -1,7 +1,7 @@
 #include <ray.hpp>
 
 #include <material.hpp>
-#include <random.hpp>
+#include <util/random.hpp>
 #include <sphere.hpp>
 #include <world.hpp>
 
@@ -14,9 +14,9 @@ position ray::point_at_parameter(const float t) const
 
 color ray::seen_color(const world& w, const int32_t depth) const
 {
-    if (const hit_record_opt hit = w.hit(*this, 0.0001f, FLT_MAX))
+    if (const hit_record_opt hit = w.hit(*this, min_max<float>{ 0.0001f, FLT_MAX }))
     {
-        if (depth < 50)
+        if (hit->p_material && depth < 50)
         {
             if (const scattering_opt s = hit->p_material->scatter(*this, *hit))
             {
