@@ -2,7 +2,6 @@
 
 #include <material.hpp>
 #include <util/random.hpp>
-#include <sphere.hpp>
 #include <world.hpp>
 
 #include <cfloat>

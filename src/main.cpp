@@ -2,9 +2,9 @@
 #include <material/dielectric.hpp>
 #include <material/lambertian.hpp>
 #include <material/metal.hpp>
-#include <util/random.hpp>
 #include <ray.hpp>
-#include <sphere.hpp>
+#include <shape/sphere.hpp>
+#include <util/random.hpp>
 #include <util/types.hpp>
 #include <world.hpp>
 
@@ -23,8 +23,7 @@ static constexpr uint32_t RENDER_THREAD_COUNT = 20;
 static float progress = 0.f;
 static std::mutex stdout_mtx;
 
-std::vector<color> render_fragment(const world* w, const camera* cam,
-    const glm::uvec2 top_left, const glm::uvec2 bottom_right)
+std::vector<color> render_fragment(const world* w, const camera* cam, const glm::uvec2 top_left, const glm::uvec2 bottom_right)
 {
     const uint32_t width = bottom_right.x - top_left.x;
     const uint32_t height = bottom_right.y - top_left.y;
@@ -100,13 +99,6 @@ int main()
     };
 
     const world w = world::random_world_balls();
-    //     w.spawn_object<sphere>(position{ 0.f, 0.25f, -0.75f }, 0.75f, std::make_unique<lambertian>(color{ 0.8f, 0.3f, 0.3f }));
-    //     w.spawn_object<sphere>(position{ 0.f, -50.5f, 0.f }, 50.f, std::make_unique<lambertian>(color{ 0.8f, 0.8f, 0.f }));
-    //     w.spawn_object<sphere>(position{ 0.f, -0.25f, 0.5f }, 0.25f, std::make_unique<dielectric>(color{ 1.f, 1.f, 1.f }, 1.5f));
-    //     w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, 0.5f, std::make_unique<dielectric>(color{ 1.f, 0.6f, 0.6f }, 1.5f));
-    //     w.spawn_object<sphere>(position{ -0.75f, 0.f, 0.25f }, -0.45f, std::make_unique<dielectric>(color{ 1.f, 1.f, 1.f }, 1.5f));
-    //     w.spawn_object<sphere>(position{ 0.75f, 0.f, 0.25f }, 0.5f, std::make_unique<metal>(color{ 0.8f, 0.6f, 0.2f }, 0.05f));
-
     const std::vector<color> image = render_image(w, cam);
 
     std::cout << "Writing to file... ";

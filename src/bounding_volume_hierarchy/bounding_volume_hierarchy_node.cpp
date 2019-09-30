@@ -74,11 +74,14 @@ bounding_volume_hierarchy_node::bounding_volume_hierarchy_node(
 
     const axis_aligned_bounding_box_opt box_left = left->bounding_box(time);
     const axis_aligned_bounding_box_opt box_right = right->bounding_box(time);
-    if (!box_left || !box_right)
+    if (box_left && box_right)
+    {
+        this->box = axis_aligned_bounding_box::surrounding(*box_left, *box_right);
+    }
+    else
     {
         throw std::runtime_error{ "Couldn't create bounding box for a BVH." };
     }
-    this->box = axis_aligned_bounding_box::surrounding(*box_left, *box_right);
 }
 
 bounding_volume_hierarchy_node::~bounding_volume_hierarchy_node()

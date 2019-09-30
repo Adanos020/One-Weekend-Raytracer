@@ -10,13 +10,11 @@ axis_aligned_bounding_box axis_aligned_bounding_box::surrounding(
     const position top_left_back = {
         std::fmin(b1.min.x, b2.min.x),
         std::fmin(b1.min.y, b2.min.y),
-        std::fmin(b1.min.z, b2.min.z)
-    };
+        std::fmin(b1.min.z, b2.min.z) };
     const position bottom_right_front = {
         std::fmax(b1.max.x, b2.max.x),
         std::fmax(b1.max.y, b2.max.y),
-        std::fmax(b1.max.z, b2.max.z)
-    };
+        std::fmax(b1.max.z, b2.max.z) };
     return axis_aligned_bounding_box{ top_left_back, bottom_right_front };
 }
 

@@ -1,7 +1,7 @@
 #include <camera.hpp>
 
-#include <util/random.hpp>
 #include <ray.hpp>
+#include <util/random.hpp>
 
 camera::camera(const camera_create_info& info)
     : origin(info.camera_position)
