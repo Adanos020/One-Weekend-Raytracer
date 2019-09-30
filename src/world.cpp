@@ -62,19 +62,8 @@ world world::random_world_balls()
 
 hit_record_opt world::hit(const ray& r, const min_max<float> t) const
 {
-    float closest = t.max;
-    hit_record_opt result;
-    for (const unique_hittable& object : this->hittables)
-    {
-        if (const hit_record_opt hit_rec = object->hit(r, min_max<float>{ t.min, closest }))
-        {
-            closest = hit_rec->t;
-            result = hit_rec;
-        }
-    }
-    return result;
-//     static const bounding_volume_hierarchy_node bvh = { { this->hittables.begin(), this->hittables.end() }, { 0.f, 0.f } };
-//     return bvh.hit(r, t);
+    static const bounding_volume_hierarchy_node bvh = { { this->hittables.begin(), this->hittables.end() }, t };
+    return bvh.hit(r, t);
 }
 
 axis_aligned_bounding_box_opt world::bounding_box(const min_max<float> t) const

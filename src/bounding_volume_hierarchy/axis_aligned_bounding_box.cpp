@@ -8,36 +8,38 @@ axis_aligned_bounding_box axis_aligned_bounding_box::surrounding(
     const axis_aligned_bounding_box& b1, const axis_aligned_bounding_box& b2)
 {
     const position top_left_back = {
-        std::fmax(b1.top_left_back.x, b2.top_left_back.x),
-        std::fmax(b1.top_left_back.y, b2.top_left_back.y),
-        std::fmax(b1.top_left_back.z, b2.top_left_back.z)
+        std::fmin(b1.min.x, b2.min.x),
+        std::fmin(b1.min.y, b2.min.y),
+        std::fmin(b1.min.z, b2.min.z)
     };
     const position bottom_right_front = {
-        std::fmin(b1.top_left_back.x, b2.top_left_back.x),
-        std::fmin(b1.top_left_back.y, b2.top_left_back.y),
-        std::fmin(b1.top_left_back.z, b2.top_left_back.z)
+        std::fmax(b1.max.x, b2.max.x),
+        std::fmax(b1.max.y, b2.max.y),
+        std::fmax(b1.max.z, b2.max.z)
     };
     return axis_aligned_bounding_box{ top_left_back, bottom_right_front };
 }
 
-bool axis_aligned_bounding_box::hit(const ray& r, min_max<float> t) const
+bool axis_aligned_bounding_box::hit(const ray& r, min_max<float> time) const
 {
-#define check_coord(coord)\
-    {\
-        const min_max<float> temp = std::minmax(\
-            (this->top_left_back.coord - r.origin.coord) / r.direction.coord,\
-            (this->bottom_right_front.coord - r.origin.coord) / r.direction.coord);\
-        t.min = std::min(temp.min, t.min);\
-        t.max = std::max(temp.max, t.max);\
-        if (t.max <= t.min)\
-        {\
-            return false;\
-        }\
-    }
+    const min_max<float> tx = {
+        (this->min.x - r.origin.x) * r.inverse_direction.x,
+        (this->max.x - r.origin.x) * r.inverse_direction.x };
+    min_max<float> t = std::minmax(tx.min, tx.max);
 
-    check_coord(x);
-    check_coord(y);
-    check_coord(z);
-#undef calc
-    return true;
+    const min_max<float> ty = {
+        (this->min.y - r.origin.y) * r.inverse_direction.y,
+        (this->max.y - r.origin.y) * r.inverse_direction.y };
+    t = {
+        std::max(t.min, std::min(ty.min, ty.max)),
+        std::min(t.max, std::max(ty.min, ty.max)) };
+
+    const min_max<float> tz = {
+        (this->min.z - r.origin.z) * r.inverse_direction.z,
+        (this->max.z - r.origin.z) * r.inverse_direction.z };
+    t = {
+        std::max(t.min, std::min(tz.min, tz.max)),
+        std::min(t.max, std::max(tz.min, tz.max)) };
+
+    return t.max >= t.min;
 }

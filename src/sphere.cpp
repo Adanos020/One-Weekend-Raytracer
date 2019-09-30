@@ -36,7 +36,7 @@ hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
 axis_aligned_bounding_box_opt sphere::bounding_box(const min_max<float> t) const
 {
     return axis_aligned_bounding_box{
-        position{ this->center + displacement{ this->radius } },
-        position{ this->center - displacement{ this->radius } }
+        position{ this->center - displacement{ this->radius } },
+        position{ this->center + displacement{ this->radius } }
     };
 }

@@ -25,15 +25,15 @@ static bool compare_boxes(const unique_hittable& a, const unique_hittable& b)
 
     if constexpr (coordinate == vector_component::x)
     {
-        return box_a->top_left_back.x < box_b->top_left_back.x;
+        return box_a->min.x < box_b->min.x;
     }
     else if constexpr (coordinate == vector_component::y)
     {
-        return box_a->top_left_back.y < box_b->top_left_back.y;
+        return box_a->min.y < box_b->min.y;
     }
     else
     {
-        return box_a->top_left_back.z < box_b->top_left_back.z;
+        return box_a->min.z < box_b->min.z;
     }
 }
 
