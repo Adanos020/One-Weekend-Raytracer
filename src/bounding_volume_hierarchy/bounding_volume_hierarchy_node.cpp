@@ -40,21 +40,21 @@ static bool compare_boxes(const unique_hittable& a, const unique_hittable& b)
 bounding_volume_hierarchy_node::bounding_volume_hierarchy_node(
     const iterator_pair<std::vector<unique_hittable>> hittables, const min_max<float> time)
 {
-    const vector_component coordinate_axis = vector_component(random_uniform<int>(0, 3));
+    const vector_component coordinate_axis = vector_component{ random_uniform<int>(0, 3) };
     if (coordinate_axis == vector_component::x)
     {
-        std::sort(hittables.begin, hittables.end, compare_boxes<vector_component::x>);
+        std::stable_sort(hittables.begin, hittables.end, compare_boxes<vector_component::x>);
     }
     else if (coordinate_axis == vector_component::y)
     {
-        std::sort(hittables.begin, hittables.end, compare_boxes<vector_component::y>);
+        std::stable_sort(hittables.begin, hittables.end, compare_boxes<vector_component::y>);
     }
     else
     {
-        std::sort(hittables.begin, hittables.end, compare_boxes<vector_component::z>);
+        std::stable_sort(hittables.begin, hittables.end, compare_boxes<vector_component::z>);
     }
 
-    if (const size_t count = hittables.end - hittables.begin; count == 1)
+    if (const size_t count = std::distance(hittables.begin, hittables.end); count == 1)
     {
         this->left = hittables.begin[0].get();
         this->right = hittables.begin[0].get();
@@ -80,7 +80,7 @@ bounding_volume_hierarchy_node::bounding_volume_hierarchy_node(
     }
     else
     {
-        throw std::runtime_error{ "Couldn't create bounding box for a BVH." };
+        throw std::runtime_error{ "Couldn't create bounding box for the BVH." };
     }
 }
 
@@ -103,11 +103,15 @@ hit_record_opt bounding_volume_hierarchy_node::hit(const struct ray& r, const mi
     {
         const hit_record_opt hit_left = this->left->hit(r, t);
         const hit_record_opt hit_right = this->right->hit(r, t);
-        if (hit_left && hit_right)
+        if (hit_left)
         {
-            return std::min(*hit_left, *hit_right, [](const hit_record& a, const hit_record& b) { return a.t < b.t; });
+            if (hit_right)
+            {
+                return std::min(*hit_left, *hit_right, [](const hit_record& a, const hit_record& b) { return a.t < b.t; });
+            }
+            return hit_left;
         }
-        return hit_left ? hit_left : hit_right;
+        return hit_right;
     }
     return {};
 }

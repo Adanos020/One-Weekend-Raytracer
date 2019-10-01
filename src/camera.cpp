@@ -6,6 +6,7 @@
 camera::camera(const camera_create_info& info)
     : origin(info.camera_position)
     , lens_radius(info.aperture * 0.5f)
+    , time(info.time)
 {
     const float fov_radians = glm::radians(info.vertical_fov);
     const float half_height = glm::tan(fov_radians * 0.5f);
@@ -27,6 +28,7 @@ ray camera::shoot_ray_at(const float s, const float t) const
     const displacement offset = (this->u * random_spot_on_lens.x) + (this->v * random_spot_on_lens.y);
     return ray{
         this->origin + offset,
-        this->lower_left_corner + (s * this->horizontal) + (t * this->vertical) - origin - offset
+        this->lower_left_corner + (s * this->horizontal) + (t * this->vertical) - origin - offset,
+        random_uniform(this->time.min, this->time.max)
     };
 }

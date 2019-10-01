@@ -19,41 +19,42 @@ world world::random_world_balls()
     {
         for (int32_t b = -11; b < 11; ++b)
         {
-            if (const position center = position{ float(a), 0.2f, float(b) } + (0.75f * random_in_unit_disk(axis{ 0.f, 1.f, 0.f }));
+            if (const position center = position{ float(a), 0.2f, float(b) } + (0.3f * random_in_unit_disk(axis{ 0.f, 1.f, 0.f }));
                 glm::distance(center, position{ 4.f, 0.2f, 0.f }) > 0.9f)
             {
                 unique_material mat;
-                if (const float choose_material = random_uniform<float>(); choose_material < 0.2f)
+                if (const float choose_material = random_uniform<float>(); choose_material < 0.35f)
                 {
                     // Matte
                     mat = std::make_unique<lambertian>(random_color());
                 }
-                else if (choose_material < 0.5f)
+                else if (choose_material < 0.7f)
                 {
                     // Metal
                     mat = std::make_unique<metal>(color{ 0.5f } + (0.5f * random_color()), random_uniform(0.f, 0.5f));
                 }
-                else if (choose_material < 0.75f)
+                else
                 {
                     // Glass and gems
                     mat = std::make_unique<dielectric>(color{ 0.5f } + (0.5f * random_color()), random_uniform(1.5f, 2.5f));
                 }
+
+                if (random_chance(0.5f))
+                {
+                    w.spawn_object<sphere>(
+                        from_to<position>(center + displacement{ 0.f, random_uniform(0.1f, 0.5f), 0.f }, center),
+                        min_max<float>(0.f, 1.f), 0.2f, std::move(mat));
+                }
                 else
                 {
-                    // Hollow glass and gem balls
-                    const float refractive_index = random_uniform(1.5f, 2.5f);
-                    mat = std::make_unique<dielectric>(color{ 0.5f } + (0.5f * random_color()), refractive_index);
-                    w.spawn_object<sphere>(center, -0.19f, std::make_unique<dielectric>(color{ 1.f }, refractive_index));
+                    w.spawn_object<sphere>(center, 0.2f, std::move(mat));
                 }
-                w.spawn_object<sphere>(center, 0.2f, std::move(mat));
             }
         }
     }
 
-    // 4 bigger spheres
+    // 3 bigger spheres
     w.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, 1.f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
-    w.spawn_object<sphere>(position{ 0.f, 1.f, 3.f }, 1.f, std::make_unique<dielectric>(color{ 0.3f, 0.3f, 1.f }, 1.5f));
-    w.spawn_object<sphere>(position{ 0.f, 1.f, 3.f }, -0.95f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
     w.spawn_object<sphere>(position{ -4.f, 1.f, 0.f }, 1.f, std::make_unique<lambertian>(color{ 0.4f, 0.2f, 0.1f }));
     w.spawn_object<sphere>(position{ 4.f, 1.f, 0.f }, 1.f, std::make_unique<metal>(color{ 0.7f, 0.6f, 0.5f }, 0.f));
 
@@ -62,7 +63,7 @@ world world::random_world_balls()
 
 hit_record_opt world::hit(const ray& r, const min_max<float> t) const
 {
-    static const bounding_volume_hierarchy_node bvh = { { this->hittables.begin(), this->hittables.end() }, t };
+    static const bounding_volume_hierarchy_node bvh = { this->hittables, t };
     return bvh.hit(r, t);
 }
 

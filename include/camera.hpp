@@ -11,6 +11,7 @@ struct camera_create_info
     float aspect_ratio;
     float aperture;
     float focus_distance;
+    min_max<float> time;
 };
 
 class camera
@@ -29,4 +30,5 @@ private:
     displacement u;
     displacement v;
     float lens_radius;
+    min_max<float> time;
 };

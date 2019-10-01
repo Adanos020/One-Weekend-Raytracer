@@ -95,7 +95,8 @@ int main()
         FOV,
         float(IMAGE_WIDTH) / float(IMAGE_HEIGHT),
         0.1f,
-        glm::distance(camera_position, look_at)
+        glm::distance(camera_position, look_at),
+        { 0.f, 1.f }
     };
 
     const world w = world::random_world_balls();

@@ -6,12 +6,16 @@
 
 struct ray
 {
-    position origin;
-    displacement direction;
-    displacement inverse_direction;
+    const position origin;
+    const displacement direction;
+    const displacement inverse_direction;
+    const float time;
 
-    ray(const position& origin, const displacement& direction)
-        : origin(origin), direction(direction), inverse_direction(1.f / direction)
+    ray(const position& origin, const displacement& direction, const float time = 0.f)
+        : origin(origin)
+        , direction(direction)
+        , inverse_direction(1.f / direction)
+        , time(time)
     {
     }
 
