@@ -1,5 +1,6 @@
 #include <util/noise.hpp>
 
+#include <util/interpolation.hpp>
 #include <util/random.hpp>
 
 #include <algorithm>
@@ -24,8 +25,20 @@ float perlin::noise(const glm::vec3& p) const
     const float u = p.x - glm::floor(p.x);
     const float v = p.y - glm::floor(p.y);
     const float w = p.z - glm::floor(p.z);
-    const int i = int(4 * p.x) & 255;
-    const int j = int(4 * p.y) & 255;
-    const int k = int(4 * p.z) & 255;
-    return this->random_numbers[this->x_permutations[i] ^ this->y_permutations[j] ^ this->z_permutations[k]];
+    const int i = glm::floor(p.x);
+    const int j = glm::floor(p.y);
+    const int k = glm::floor(p.z);
+
+    std::array<float, 8> c;
+    for (size_t it = 0; it < c.size(); ++it)
+    {
+        const size_t di = (it & 4) >> 2;
+        const size_t dj = (it & 2) >> 1;
+        const size_t dk = (it & 1) >> 0;
+        c[it] = this->random_numbers[
+            this->x_permutations[(i + di) & 255] ^
+            this->y_permutations[(j + dj) & 255] ^
+            this->z_permutations[(k + dk) & 255]];
+    }
+    return trilerp(c, u, v, w);
 }
