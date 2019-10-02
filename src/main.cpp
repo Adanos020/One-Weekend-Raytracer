@@ -86,7 +86,7 @@ std::vector<color> render_image(const world& w, const camera& cam)
 
 int main()
 {
-    const position camera_position = { 8.f, 3.f, 3.f };
+    const position camera_position = { 8.f, 2.f, 3.f };
     const position look_at = { 0.f, 0.f, -1.f };
     const camera cam = camera_create_info{
         camera_position,
@@ -94,7 +94,7 @@ int main()
         axis{ 0.f, 1.f, 0.f },
         FOV,
         float(IMAGE_WIDTH) / float(IMAGE_HEIGHT),
-        0.1f,
+        0.05f,
         glm::distance(camera_position, look_at),
         { 0.f, 1.f }
     };

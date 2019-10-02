@@ -3,13 +3,22 @@
 #include <hittable.hpp>
 #include <util/random.hpp>
 
-lambertian::lambertian(const color& albedo)
-    : albedo(albedo)
+#include <stdexcept>
+
+lambertian::lambertian(unique_texture&& albedo)
+    : albedo(std::move(albedo))
 {
+    if (!this->albedo)
+    {
+        throw std::runtime_error{ "lambertian: Given texture should not be null." };
+    }
 }
 
 scattering_opt lambertian::scatter(const ray& r, const hit_record& hit) const
 {
     const position target = hit.point + hit.normal + random_direction();
-    return scattering{ this->albedo, ray{ hit.point, target - hit.point, r.time } };
+    return scattering{
+        this->albedo->value_at(0.f, 0.f, hit.point),
+        ray{ hit.point, target - hit.point, r.time }
+    };
 }

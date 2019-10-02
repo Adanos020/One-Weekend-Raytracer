@@ -60,6 +60,5 @@ position sphere::center_at_time(const float time) const
     const position from = this->center_transition.from;
     const position to = this->center_transition.to;
     const float t_min = this->time_transition.min;
-    const float t_max = this->time_transition.max;
     return from + ((time - t_min) * this->inverse_time_interval) * (to - from);
 }

@@ -5,6 +5,8 @@
 #include <material/lambertian.hpp>
 #include <material/metal.hpp>
 #include <shape/sphere.hpp>
+#include <texture/checker.hpp>
+#include <texture/constant.hpp>
 #include <util/random.hpp>
 
 world world::random_world_balls()
@@ -12,7 +14,11 @@ world world::random_world_balls()
     world w;
 
     // earth
-    w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f, std::make_unique<lambertian>(color{ 0.5f }));
+    w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f,
+        std::make_unique<lambertian>(
+            std::make_unique<checker_texture>(
+                std::make_unique<constant_texture>(color{ 0.2f, 0.3f, 0.1f }),
+                std::make_unique<constant_texture>(color{ 0.9f }))));
 
     // random smaller spheres
     for (int32_t a = -11; a < 11; ++a)
@@ -26,7 +32,7 @@ world world::random_world_balls()
                 if (const float choose_material = random_uniform<float>(); choose_material < 0.35f)
                 {
                     // Matte
-                    mat = std::make_unique<lambertian>(random_color());
+                    mat = std::make_unique<lambertian>(std::make_unique<constant_texture>(random_color()));
                 }
                 else if (choose_material < 0.7f)
                 {
@@ -42,7 +48,7 @@ world world::random_world_balls()
                 if (random_chance(0.5f))
                 {
                     w.spawn_object<sphere>(
-                        from_to<position>(center + displacement{ 0.f, random_uniform(0.1f, 0.5f), 0.f }, center),
+                        from_to<position>(center + displacement{ 0.f, random_uniform(0.1f, 0.3f), 0.f }, center),
                         min_max<float>(0.f, 1.f), 0.2f, std::move(mat));
                 }
                 else
@@ -55,7 +61,8 @@ world world::random_world_balls()
 
     // 3 bigger spheres
     w.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, 1.f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
-    w.spawn_object<sphere>(position{ -4.f, 1.f, 0.f }, 1.f, std::make_unique<lambertian>(color{ 0.4f, 0.2f, 0.1f }));
+    w.spawn_object<sphere>(position{ -4.f, 1.f, 0.f }, 1.f,
+        std::make_unique<lambertian>(std::make_unique<constant_texture>(color{ 0.4f, 0.2f, 0.1f })));
     w.spawn_object<sphere>(position{ 4.f, 1.f, 0.f }, 1.f, std::make_unique<metal>(color{ 0.7f, 0.6f, 0.5f }, 0.f));
 
     return w;
