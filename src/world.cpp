@@ -7,7 +7,19 @@
 #include <shape/sphere.hpp>
 #include <texture/checker.hpp>
 #include <texture/constant.hpp>
+#include <texture/noise.hpp>
 #include <util/random.hpp>
+
+hit_record_opt world::hit(const ray& r, const min_max<float> t) const
+{
+    static const bounding_volume_hierarchy_node bvh = { this->hittables, t };
+    return bvh.hit(r, t);
+}
+
+axis_aligned_bounding_box_opt world::bounding_box(const min_max<float> t) const
+{
+    return this->box;
+}
 
 world world::random_world_balls()
 {
@@ -25,7 +37,7 @@ world world::random_world_balls()
     {
         for (int32_t b = -11; b < 11; ++b)
         {
-            if (const position center = position{ float(a), 0.2f, float(b) } + (0.3f * random_in_unit_disk(axis{ 0.f, 1.f, 0.f }));
+            if (const position center = position{ float(a), 0.2f, float(b) } +(0.3f * random_in_unit_disk(axis{ 0.f, 1.f, 0.f }));
                 glm::distance(center, position{ 4.f, 0.2f, 0.f }) > 0.9f)
             {
                 unique_material mat;
@@ -37,12 +49,12 @@ world world::random_world_balls()
                 else if (choose_material < 0.7f)
                 {
                     // Metal
-                    mat = std::make_unique<metal>(color{ 0.5f } + (0.5f * random_color()), random_uniform(0.f, 0.5f));
+                    mat = std::make_unique<metal>(color{ 0.5f } +(0.5f * random_color()), random_uniform(0.f, 0.5f));
                 }
                 else
                 {
                     // Glass and gems
-                    mat = std::make_unique<dielectric>(color{ 0.5f } + (0.5f * random_color()), random_uniform(1.5f, 2.5f));
+                    mat = std::make_unique<dielectric>(color{ 0.5f } +(0.5f * random_color()), random_uniform(1.5f, 2.5f));
                 }
 
                 if (random_chance(0.5f))
@@ -68,13 +80,14 @@ world world::random_world_balls()
     return w;
 }
 
-hit_record_opt world::hit(const ray& r, const min_max<float> t) const
+world world::two_noise_spheres()
 {
-    static const bounding_volume_hierarchy_node bvh = { this->hittables, t };
-    return bvh.hit(r, t);
-}
+    world w;
 
-axis_aligned_bounding_box_opt world::bounding_box(const min_max<float> t) const
-{
-    return this->box;
+    w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f,
+        std::make_unique<lambertian>(std::make_unique<noise_texture>()));
+    w.spawn_object<sphere>(position{ 0.f, 2.f, 0.f }, 2.f,
+        std::make_unique<lambertian>(std::make_unique<noise_texture>()));
+
+    return w;
 }

@@ -99,7 +99,8 @@ int main()
         { 0.f, 1.f }
     };
 
-    const world w = world::random_world_balls();
+    //const world w = world::random_world_balls();
+    const world w = world::two_noise_spheres();
     const std::vector<color> image = render_image(w, cam);
 
     std::cout << "Writing to file... ";

@@ -11,8 +11,6 @@
 class world : public hittable
 {
 public:
-    static world random_world_balls();
-
     template<class T, typename... Args>
     void spawn_object(Args... args)
     {
@@ -27,6 +25,9 @@ public:
 
     virtual hit_record_opt hit(const struct ray&, const min_max<float> t) const override;
     virtual axis_aligned_bounding_box_opt bounding_box(const min_max<float> t) const override;
+
+    static world random_world_balls();
+    static world two_noise_spheres();
 
 private:
     mutable std::vector<unique_hittable> hittables;
