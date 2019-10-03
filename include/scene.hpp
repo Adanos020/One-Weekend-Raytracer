@@ -12,4 +12,5 @@ struct scene
 
     static scene random_world_balls(const extent_2d<uint32_t>&);
     static scene two_noise_spheres(const extent_2d<uint32_t>&);
+    static scene earth(const extent_2d<uint32_t>&);
 };

@@ -82,7 +82,7 @@ std::vector<color> render_scene(const scene& in_scene)
 int main()
 {
     const extent_2d<uint32_t> image_size = { 1600, 900 };
-    const std::vector<color> image = render_scene(scene::two_noise_spheres(image_size));
+    const std::vector<color> image = render_scene(scene::earth(image_size));
 
     std::cout << "Writing to file... ";
 

@@ -2,9 +2,12 @@
 
 #include <ray.hpp>
 
+#include <glm/gtc/constants.hpp>
+
 sphere::sphere(const position& center, const float radius, unique_material&& mat)
     : sphere({ center, center }, { 0.f, 0.f }, radius, std::move(mat))
 {
+    this->mat->parent_shape = this;
 }
 
 sphere::sphere(const from_to<position>& center_transition, const min_max<float> time_transition,
@@ -12,6 +15,7 @@ sphere::sphere(const from_to<position>& center_transition, const min_max<float> 
     : center_transition(center_transition)
     , time_transition(time_transition)
     , radius(radius)
+    , inverse_radius(1.f / radius)
     , mat(std::move(mat))
 {
     if (const float interval = time_transition.max - time_transition.min; interval != 0.f)
@@ -61,4 +65,12 @@ position sphere::center_at_time(const float time) const
     const position to = this->center_transition.to;
     const float t_min = this->time_transition.min;
     return from + ((time - t_min) * this->inverse_time_interval) * (to - from);
+}
+
+std::pair<float, float> sphere::uv_at(const position& p, const float time) const
+{
+    const displacement normalized_p = this->inverse_radius * (p - this->center_at_time(time));
+    return std::make_pair(
+        1.f - (glm::atan(normalized_p.z, normalized_p.x) + glm::pi<float>()) * glm::one_over_two_pi<float>(),
+        (glm::asin(normalized_p.y) + glm::half_pi<float>()) * glm::one_over_pi<float>());
 }

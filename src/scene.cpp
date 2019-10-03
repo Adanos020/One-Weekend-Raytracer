@@ -6,6 +6,7 @@
 #include <shape/sphere.hpp>
 #include <texture/checker.hpp>
 #include <texture/constant.hpp>
+#include <texture/image.hpp>
 #include <texture/noise.hpp>
 #include <util/noise.hpp>
 #include <util/random.hpp>
@@ -99,4 +100,22 @@ scene scene::two_noise_spheres(const extent_2d<uint32_t>& image_size)
             [](const perlin& n, const glm::vec3& p) { return 0.5f * (1.f + glm::sin(p.z + 10.f * turbulence(n, p))); })));
 
     return scene{ image_size, cam, std::move(w) };
+}
+
+scene scene::earth(const extent_2d<uint32_t>& image_size)
+{
+    const camera cam = camera_create_info{
+        position{ 5.f, 0.f, 0.f },
+        position{ 0.f, 0.f, 0.f },
+        axis{ 0.f, 1.f, 0.f },
+        45.f,
+        float(image_size.width) / float(image_size.height),
+        0.05f,
+        { 0.f, 1.f }
+    };
+
+    world w;
+    w.spawn_object<sphere>(position{ 0.f, 0.f, 0.f }, 1.5f,
+        std::make_unique<lambertian>(std::make_unique<image_texture>("textures/earthmap.jpg")));
+    return { image_size, cam, std::move(w) };
 }
