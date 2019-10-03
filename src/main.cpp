@@ -1,32 +1,25 @@
-#include <camera.hpp>
-#include <material/dielectric.hpp>
-#include <material/lambertian.hpp>
-#include <material/metal.hpp>
 #include <ray.hpp>
-#include <shape/sphere.hpp>
+#include <scene.hpp>
 #include <util/random.hpp>
 #include <util/types.hpp>
-#include <world.hpp>
 
+#include <array>
 #include <fstream>
 #include <future>
-#include <glm/glm.hpp>
 #include <iostream>
 #include <iomanip>
-
-static constexpr uint32_t IMAGE_WIDTH = 1600;
-static constexpr uint32_t IMAGE_HEIGHT = 900;
-static constexpr float FOV = 45.f;
-static constexpr uint32_t SAMPLE_COUNT = 500;
-static constexpr uint32_t RENDER_THREAD_COUNT = 20;
 
 static float progress = 0.f;
 static std::mutex stdout_mtx;
 
-std::vector<color> render_fragment(const world* w, const camera* cam, const glm::uvec2 top_left, const glm::uvec2 bottom_right)
+std::vector<color> render_fragment(const scene* in_scene, const glm::uvec2 top_left, const glm::uvec2 bottom_right)
 {
+    const uint32_t sample_count = 500;
     const uint32_t width = bottom_right.x - top_left.x;
     const uint32_t height = bottom_right.y - top_left.y;
+    const float inverse_image_width = 1.f / in_scene->image_size.width;
+    const float inverse_image_height = 1.f / in_scene->image_size.height;
+    const float inverse_sample_count = 1.f / sample_count;
 
     std::vector<color> image_fragment;
     image_fragment.reserve(size_t(width) * height);
@@ -36,14 +29,14 @@ std::vector<color> render_fragment(const world* w, const camera* cam, const glm:
         for (uint32_t x = top_left.x; x < bottom_right.x; ++x)
         {
             color col{ 0.f };
-            for (uint32_t s = 0; s < SAMPLE_COUNT; ++s)
+            for (uint32_t s = 0; s < sample_count; ++s)
             {
-                const float u = float(x + random_uniform(0.f, 1.f)) / IMAGE_WIDTH;
-                const float v = float(IMAGE_HEIGHT - y + random_uniform(0.f, 1.f)) / IMAGE_HEIGHT;
-                const ray r = cam->shoot_ray_at(u, v);
-                col += r.seen_color(*w, 0);
+                const float u = float(x + random_uniform(0.f, 1.f)) * inverse_image_width;
+                const float v = float(in_scene->image_size.height - y + random_uniform(0.f, 1.f)) * inverse_image_height;
+                const ray r = in_scene->cam.shoot_ray_at(u, v);
+                col += r.seen_color(in_scene->w, 0);
             }
-            col /= float(SAMPLE_COUNT);
+            col *= inverse_sample_count;
             col = { glm::sqrt(col.r), glm::sqrt(col.g), glm::sqrt(col.b) };
             col *= 255.99f;
 
@@ -51,23 +44,25 @@ std::vector<color> render_fragment(const world* w, const camera* cam, const glm:
         }
 
         std::lock_guard lock{ stdout_mtx };
-        progress += 100.f / IMAGE_HEIGHT;
+        progress += 100.f * inverse_image_height;
         std::cout << "\rRendering image fragments... " << std::fixed << std::setprecision(2) << progress << "%";
     }
     return image_fragment;
 }
 
-std::vector<color> render_image(const world& w, const camera& cam)
+std::vector<color> render_scene(const scene& in_scene)
 {
-    const uint32_t fragment_height = IMAGE_HEIGHT / RENDER_THREAD_COUNT;
+    const uint32_t render_thread_count = 20;
+    const uint32_t fragment_height = in_scene.image_size.height / render_thread_count;
 
     std::cout << "Starting jobs... ";
 
-    std::vector<std::future<std::vector<color>>> image_fragments{ RENDER_THREAD_COUNT };
+    std::array<std::future<std::vector<color>>, render_thread_count> image_fragments;
     for (uint32_t i = 0; i < image_fragments.size(); ++i)
     {
         image_fragments[i] = std::async(std::launch::async, render_fragment,
-            &w, &cam, glm::uvec2{ 0, i * fragment_height }, glm::uvec2{ IMAGE_WIDTH, (i + 1) * fragment_height });
+            &in_scene, glm::uvec2{ 0, i * fragment_height },
+            glm::uvec2{ in_scene.image_size.width, (i + 1) * fragment_height });
     }
 
     std::cout << "Done." << std::endl;
@@ -86,27 +81,13 @@ std::vector<color> render_image(const world& w, const camera& cam)
 
 int main()
 {
-    const position camera_position = { 8.f, 2.f, 3.f };
-    const position look_at = { 0.f, 0.f, -1.f };
-    const camera cam = camera_create_info{
-        camera_position,
-        look_at,
-        axis{ 0.f, 1.f, 0.f },
-        FOV,
-        float(IMAGE_WIDTH) / float(IMAGE_HEIGHT),
-        0.05f,
-        glm::distance(camera_position, look_at),
-        { 0.f, 1.f }
-    };
-
-    //const world w = world::random_world_balls();
-    const world w = world::two_noise_spheres();
-    const std::vector<color> image = render_image(w, cam);
+    const extent_2d<uint32_t> image_size = { 1600, 900 };
+    const std::vector<color> image = render_scene(scene::two_noise_spheres(image_size));
 
     std::cout << "Writing to file... ";
 
     std::ofstream file{ "image.ppm" };
-    file << "P3\n" << IMAGE_WIDTH << " " << IMAGE_HEIGHT << "\n255\n";
+    file << "P3\n" << image_size.width << " " << image_size.height << "\n255\n";
     for (const color& col : image)
     {
         file << uint32_t(col.r) << " " << uint32_t(col.g) << " " << uint32_t(col.b) << "\n";

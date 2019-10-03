@@ -10,17 +10,46 @@ using color = glm::vec3;
 using axis = glm::vec3;
 
 template <typename T>
+struct extent_2d
+{
+    static_assert(std::is_arithmetic_v<T>);
+
+    constexpr extent_2d(const T width, const T height)
+        : width(width), height(height)
+    {
+    }
+
+    T width;
+    T height;
+};
+
+template <typename T>
+struct extent_3d
+{
+    static_assert(std::is_arithmetic_v<T>);
+
+    constexpr extent_3d(const T width, const T height, const T depth)
+        : width(width), height(height), depth(depth)
+    {
+    }
+
+    T width;
+    T height;
+    T depth;
+};
+
+template <typename T>
 struct min_max
 {
     T min;
     T max;
 
-    min_max(const T& min = T{}, const T& max = T{})
+    constexpr min_max(const T& min = T{}, const T& max = T{})
         : min(min), max(max)
     {
     }
 
-    min_max(const std::pair<const T&, const T&>& pair)
+    constexpr min_max(const std::pair<const T&, const T&>& pair)
         : min(pair.first), max(pair.second)
     {
     }
@@ -32,12 +61,12 @@ struct from_to
     T from;
     T to;
 
-    from_to(const T& from = T{}, const T& to = T{})
+    constexpr from_to(const T& from = T{}, const T& to = T{})
         : from(from), to(to)
     {
     }
 
-    from_to(const std::pair<const T&, const T&>& pair)
+    constexpr from_to(const std::pair<const T&, const T&>& pair)
         : from(pair.first), to(pair.second)
     {
     }
