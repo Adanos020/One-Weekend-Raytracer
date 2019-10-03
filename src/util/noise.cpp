@@ -8,7 +8,11 @@
 
 perlin::perlin()
 {
-    std::generate(this->random_numbers.begin(), this->random_numbers.end(), []{ return random_uniform<float>(); });
+    std::generate(this->random_vectors.begin(), this->random_vectors.end(), [] {
+        return glm::normalize(glm::vec3{
+            random_uniform(-1.f, 1.f), random_uniform(-1.f, 1.f), random_uniform(-1.f, 1.f)
+        });
+    });
 
     std::iota(this->x_permutations.begin(), this->x_permutations.end(), 0);
     std::iota(this->y_permutations.begin(), this->y_permutations.end(), 0);
@@ -29,16 +33,16 @@ float perlin::noise(const glm::vec3& p) const
     const int j = glm::floor(p.y);
     const int k = glm::floor(p.z);
 
-    std::array<float, 8> c;
+    std::array<glm::vec3, 8> c;
     for (size_t it = 0; it < c.size(); ++it)
     {
         const size_t di = (it & 4) >> 2;
         const size_t dj = (it & 2) >> 1;
         const size_t dk = (it & 1) >> 0;
-        c[it] = this->random_numbers[
+        c[it] = this->random_vectors[
             this->x_permutations[(i + di) & 255] ^
             this->y_permutations[(j + dj) & 255] ^
             this->z_permutations[(k + dk) & 255]];
     }
-    return trilerp(c, u, v, w);
+    return perlin_trilerp(c, u, v, w);
 }

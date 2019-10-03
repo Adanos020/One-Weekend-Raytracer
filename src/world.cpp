@@ -8,6 +8,7 @@
 #include <texture/checker.hpp>
 #include <texture/constant.hpp>
 #include <texture/noise.hpp>
+#include <util/noise.hpp>
 #include <util/random.hpp>
 
 hit_record_opt world::hit(const ray& r, const min_max<float> t) const
@@ -49,12 +50,12 @@ world world::random_world_balls()
                 else if (choose_material < 0.7f)
                 {
                     // Metal
-                    mat = std::make_unique<metal>(color{ 0.5f } +(0.5f * random_color()), random_uniform(0.f, 0.5f));
+                    mat = std::make_unique<metal>(color{ 0.5f } + (0.5f * random_color()), random_uniform(0.f, 0.5f));
                 }
                 else
                 {
                     // Glass and gems
-                    mat = std::make_unique<dielectric>(color{ 0.5f } +(0.5f * random_color()), random_uniform(1.5f, 2.5f));
+                    mat = std::make_unique<dielectric>(color{ 0.5f } + (0.5f * random_color()), random_uniform(1.5f, 2.5f));
                 }
 
                 if (random_chance(0.5f))
@@ -85,9 +86,11 @@ world world::two_noise_spheres()
     world w;
 
     w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f,
-        std::make_unique<lambertian>(std::make_unique<noise_texture>()));
+        std::make_unique<lambertian>(std::make_unique<noise_texture>(3.f,
+            [](const perlin& n, const glm::vec3& p) { return turbulence(n, p); })));
     w.spawn_object<sphere>(position{ 0.f, 2.f, 0.f }, 2.f,
-        std::make_unique<lambertian>(std::make_unique<noise_texture>()));
+        std::make_unique<lambertian>(std::make_unique<noise_texture>(2.f,
+            [](const perlin& n, const glm::vec3& p) { return 0.5f * (1.f + glm::sin(p.z + 10.f * turbulence(n, p))); })));
 
     return w;
 }
