@@ -2,8 +2,8 @@
 
 #include <stdexcept>
 
-checker_texture::checker_texture(unique_texture&& odd, unique_texture&& even)
-    : odd(std::move(odd)), even(std::move(even))
+checker_texture::checker_texture(const float scale, unique_texture&& odd, unique_texture&& even)
+    : scale(scale), odd(std::move(odd)), even(std::move(even))
 {
     if (!this->odd || !this->even)
     {
@@ -11,11 +11,11 @@ checker_texture::checker_texture(unique_texture&& odd, unique_texture&& even)
     }
 }
 
-color checker_texture::value_at(const float u, const float v, const position& p) const
+color checker_texture::value_at(const std::pair<float, float> uv, const position& p) const
 {
-    if (glm::sin(10.f * p.x) * glm::sin(10.f * p.y) * glm::sin(10.f * p.z) < 0)
+    if (glm::sin(scale * p.x) * glm::sin(scale * p.y) * glm::sin(scale * p.z) < 0)
     {
-        return this->odd->value_at(u, v, p);
+        return this->odd->value_at(uv, p);
     }
-    return this->even->value_at(u, v, p);
+    return this->even->value_at(uv, p);
 }

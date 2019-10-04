@@ -12,6 +12,7 @@ struct hit_record
     position point;
     displacement normal;
     class material* p_material;
+    std::pair<float, float> uv = { 0.f, 0.f };
 };
 
 using hit_record_opt = std::optional<hit_record>;

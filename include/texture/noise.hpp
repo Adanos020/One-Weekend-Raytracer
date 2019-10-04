@@ -14,7 +14,7 @@ public:
     noise_texture(const float scale, const noise_transform_fn& =
         [](const perlin& n, const glm::vec3& p) { return 0.5f * (1.f + n.noise(p)); });
 
-    virtual color value_at(const float u, const float v, const position&) const override;
+    virtual color value_at(const std::pair<float, float> uv, const position&) const override;
 
 private:
     perlin noise;

@@ -5,7 +5,7 @@ constant_texture::constant_texture(const color& value)
 {
 }
 
-color constant_texture::value_at(const float u, const float v, const position& p) const
+color constant_texture::value_at(const std::pair<float, float> uv, const position& p) const
 {
     return this->value;
 }

@@ -6,11 +6,12 @@ class checker_texture : public texture
 {
 public:
     checker_texture() = default;
-    checker_texture(unique_texture&& odd, unique_texture&& even);
+    checker_texture(const float scale, unique_texture&& odd, unique_texture&& even);
 
-    virtual color value_at(const float u, const float v, const position&) const override;
+    virtual color value_at(const std::pair<float, float> uv, const position&) const override;
 
 private:
+    float scale = 1.f;
     unique_texture odd;
     unique_texture even;
 };

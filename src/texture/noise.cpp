@@ -6,7 +6,7 @@ noise_texture::noise_texture(const float scale, const noise_transform_fn& noise_
 {
 }
 
-color noise_texture::value_at(const float u, const float v, const position& p) const
+color noise_texture::value_at(const std::pair<float, float> uv, const position& p) const
 {
     return color{ 1.f } * this->noise_transform(this->noise, this->scale * p);
 }

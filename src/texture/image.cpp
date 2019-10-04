@@ -27,10 +27,13 @@ image_texture::image_texture(std::string_view image_path)
     {
         this->data[i] = normalized_rgb * color{ data[3 * i + 0], data[3 * i + 1], data[3 * i + 2] };
     }
+
+    stbi_image_free(data);
 }
 
-color image_texture::value_at(const float u, const float v, const position&) const
+color image_texture::value_at(const std::pair<float, float> uv, const position&) const
 {
+    const auto [u, v] = uv;
     const size_t i = std::clamp<size_t>(u * float(this->size.width), 0, this->size.width - 1);
     const size_t j = std::clamp<size_t>((1.f - v) * float(this->size.height) - 0.001f, 0, this->size.height - 1);
     return this->data[i + j * this->size.width];

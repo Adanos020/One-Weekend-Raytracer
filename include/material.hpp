@@ -19,8 +19,7 @@ class material
 public:
     virtual ~material() = default;
     virtual scattering_opt scatter(const ray&, const struct hit_record&) const = 0;
-
-    class sphere* parent_shape;
+    virtual color emitted(const std::pair<float, float> uv, const position&) const;
 };
 
 using unique_material = std::unique_ptr<material>;

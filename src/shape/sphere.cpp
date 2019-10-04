@@ -7,7 +7,6 @@
 sphere::sphere(const position& center, const float radius, unique_material&& mat)
     : sphere({ center, center }, { 0.f, 0.f }, radius, std::move(mat))
 {
-    this->mat->parent_shape = this;
 }
 
 sphere::sphere(const from_to<position>& center_transition, const min_max<float> time_transition,
@@ -37,12 +36,14 @@ hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
         if (const float root_1 = (-b - glm::sqrt(discriminant)) / a; root_1 < t.max && root_1 > t.min)
         {
             const position point = r.point_at_parameter(root_1);
-            return hit_record{ root_1, point, (point - this->center_at_time(r.time)) / radius, this->mat.get() };
+            const std::pair<float, float> uv = this->uv_at(point, r.time);
+            return hit_record{ root_1, point, (point - this->center_at_time(r.time)) / radius, this->mat.get(), uv };
         }
         if (const float root_2 = (-b + glm::sqrt(discriminant)) / a; root_2 < t.max && root_2 > t.min)
         {
             const position point = r.point_at_parameter(root_2);
-            return hit_record{ root_2, point, (point - this->center_at_time(r.time)) / radius, this->mat.get() };
+            const std::pair<float, float> uv = this->uv_at(point, r.time);
+            return hit_record{ root_2, point, (point - this->center_at_time(r.time)) / radius, this->mat.get(), uv };
         }
     }
     return {};
@@ -50,13 +51,14 @@ hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
 
 axis_aligned_bounding_box_opt sphere::bounding_box(const min_max<float> t) const
 {
+    const float r = glm::abs(this->radius);
     return axis_aligned_bounding_box::surrounding(
         axis_aligned_bounding_box{
-            position{ this->center_transition.from - displacement{ this->radius } },
-            position{ this->center_transition.from + displacement{ this->radius } } },
+            position{ this->center_transition.from - displacement{ r } },
+            position{ this->center_transition.from + displacement{ r } } },
         axis_aligned_bounding_box{
-            position{ this->center_transition.to - displacement{ this->radius } },
-            position{ this->center_transition.to + displacement{ this->radius } } });
+            position{ this->center_transition.to - displacement{ r } },
+            position{ this->center_transition.to + displacement{ r } } });
 }
 
 position sphere::center_at_time(const float time) const

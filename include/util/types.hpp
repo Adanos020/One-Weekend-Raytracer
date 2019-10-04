@@ -6,8 +6,10 @@
 
 using position = glm::vec3;
 using displacement = glm::vec3;
-using color = glm::vec3;
 using axis = glm::vec3;
+using color = glm::vec3;
+using rgb = glm::u8vec3;
+using rgba = glm::u8vec4;
 
 template <typename T>
 struct extent_2d

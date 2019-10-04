@@ -18,9 +18,8 @@ lambertian::lambertian(unique_texture&& albedo)
 scattering_opt lambertian::scatter(const ray& r, const hit_record& hit) const
 {
     const position target = hit.point + hit.normal + random_direction();
-    auto [u, v] = this->parent_shape ? this->parent_shape->uv_at(hit.point, r.time) : std::make_pair(0.f, 0.f);
     return scattering{
-        this->albedo->value_at(u, v, hit.point),
+        this->albedo->value_at(hit.uv, hit.point),
         ray{ hit.point, target - hit.point, r.time }
     };
 }

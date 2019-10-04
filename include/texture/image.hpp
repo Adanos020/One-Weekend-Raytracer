@@ -12,7 +12,7 @@ public:
     image_texture() = default;
     image_texture(std::string_view image_path);
     image_texture(const std::vector<color>& data, const extent_2d<size_t> size);
-    virtual color value_at(const float u, const float v, const position&) const override;
+    virtual color value_at(const std::pair<float, float> uv, const position&) const override;
 
 private:
     std::vector<color> data;
