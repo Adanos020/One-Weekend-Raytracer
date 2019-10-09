@@ -97,12 +97,12 @@ bounding_volume_hierarchy_node::~bounding_volume_hierarchy_node()
     }
 }
 
-hit_record_opt bounding_volume_hierarchy_node::hit(const struct ray& r, const min_max<float> t) const
+hit_record_opt bounding_volume_hierarchy_node::hit(const struct line& ray, const min_max<float> t) const
 {
-    if (this->box.hit(r, t))
+    if (this->box.hit(ray, t))
     {
-        const hit_record_opt hit_left = this->left->hit(r, t);
-        const hit_record_opt hit_right = this->right->hit(r, t);
+        const hit_record_opt hit_left = this->left->hit(ray, t);
+        const hit_record_opt hit_right = this->right->hit(ray, t);
         if (hit_left)
         {
             if (hit_right)

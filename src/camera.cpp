@@ -1,6 +1,6 @@
 #include <camera.hpp>
 
-#include <ray.hpp>
+#include <line.hpp>
 #include <util/random.hpp>
 
 camera::camera(const camera_create_info& info)
@@ -11,8 +11,7 @@ camera::camera(const camera_create_info& info)
     , lens_radius(info.aperture * 0.5f)
     , time(info.time)
 {
-    const float fov_radians = glm::radians(info.vertical_fov);
-    const float half_height = glm::tan(fov_radians * 0.5f);
+    const float half_height = glm::tan(glm::radians(info.vertical_fov) * 0.5f);
     const float half_width = info.aspect_ratio * half_height;
     const float focus_distance = glm::distance(info.camera_position, info.looking_at);
 
@@ -22,11 +21,11 @@ camera::camera(const camera_create_info& info)
     this->vertical = 2.f * half_height * focus_distance * v;
 }
 
-ray camera::shoot_ray_at(const float s, const float t) const
+line camera::shoot_ray_at(const float s, const float t) const
 {
     const displacement random_spot_on_lens = this->lens_radius * random_in_unit_disk();
     const displacement offset = (this->u * random_spot_on_lens.x) + (this->v * random_spot_on_lens.y);
-    return ray{
+    return line{
         this->origin + offset,
         this->lower_left_corner + (s * this->horizontal) + (t * this->vertical) - origin - offset,
         random_uniform(this->time.min, this->time.max)

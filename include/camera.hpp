@@ -16,12 +16,14 @@ struct camera_create_info
 class camera
 {
 public:
+    position origin;
+
+public:
     camera(const camera_create_info&);
 
-    struct ray shoot_ray_at(const float u, const float v) const;
+    struct line shoot_ray_at(const float u, const float v) const;
 
 private:
-    position origin;
     position lower_left_corner;
     position horizontal;
     position vertical;

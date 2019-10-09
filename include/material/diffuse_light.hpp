@@ -9,7 +9,7 @@ public:
     diffuse_light(const color&);
     diffuse_light(unique_texture&&);
 
-    virtual scattering_opt scatter(const ray&, const struct hit_record&) const override;
+    virtual scattering_opt scatter(const line&, const struct hit_record&) const override;
     virtual color emitted(const std::pair<float, float> uv, const position&) const override;
 
 private:

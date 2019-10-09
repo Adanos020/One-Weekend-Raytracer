@@ -13,7 +13,7 @@ public:
         const min_max<float> time);
     ~bounding_volume_hierarchy_node();
 
-    virtual hit_record_opt hit(const struct ray&, const min_max<float> t) const override;
+    virtual hit_record_opt hit(const struct line&, const min_max<float> t) const override;
     virtual axis_aligned_bounding_box_opt bounding_box(const min_max<float> t) const override;
 
 private:

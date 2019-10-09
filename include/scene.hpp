@@ -2,6 +2,7 @@
 
 #include <bounding_volume_hierarchy/axis_aligned_bounding_box.hpp>
 #include <hittable.hpp>
+#include <texture/constant.hpp>
 
 #include <memory>
 #include <type_traits>
@@ -11,6 +12,11 @@
 class scene : public hittable
 {
 public:
+    unique_texture sky;
+
+public:
+    scene(unique_texture&& sky = std::make_unique<constant_texture>(color{ 1.f }));
+
     template<class T, typename... Args>
     void spawn_object(Args... args)
     {
@@ -24,7 +30,7 @@ public:
         }
     }
 
-    virtual hit_record_opt hit(const struct ray&, const min_max<float> t) const override;
+    virtual hit_record_opt hit(const struct line&, const min_max<float> t) const override;
     virtual axis_aligned_bounding_box_opt bounding_box(const min_max<float> t) const override;
 
 private:

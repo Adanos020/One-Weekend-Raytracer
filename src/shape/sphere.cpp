@@ -1,6 +1,6 @@
 #include <shape/sphere.hpp>
 
-#include <ray.hpp>
+#include <line.hpp>
 
 #include <glm/gtc/constants.hpp>
 
@@ -23,11 +23,11 @@ sphere::sphere(const from_to<position>& center_transition, const min_max<float> 
     }
 }
 
-hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
+hit_record_opt sphere::hit(const line& ray, const min_max<float> t) const
 {
-    const displacement oc = r.origin - this->center_at_time(r.time);
-    const float a = glm::dot(r.direction, r.direction);
-    const float b = glm::dot(oc, r.direction);
+    const displacement oc = ray.origin - this->center_at_time(ray.time);
+    const float a = glm::dot(ray.direction, ray.direction);
+    const float b = glm::dot(oc, ray.direction);
     const float c = glm::dot(oc, oc) - this->radius * this->radius;
     const float discriminant = b * b - a * c;
 
@@ -35,15 +35,15 @@ hit_record_opt sphere::hit(const ray& r, const min_max<float> t) const
     {
         if (const float root_1 = (-b - glm::sqrt(discriminant)) / a; root_1 < t.max && root_1 > t.min)
         {
-            const position point = r.point_at_parameter(root_1);
-            const std::pair<float, float> uv = this->uv_at(point, r.time);
-            return hit_record{ root_1, point, (point - this->center_at_time(r.time)) / radius, this->mat.get(), uv };
+            const position point = ray.point_at_parameter(root_1);
+            const std::pair<float, float> uv = this->uv_at(point, ray.time);
+            return hit_record{ root_1, point, (point - this->center_at_time(ray.time)) / this->radius, this->mat.get(), uv };
         }
         if (const float root_2 = (-b + glm::sqrt(discriminant)) / a; root_2 < t.max && root_2 > t.min)
         {
-            const position point = r.point_at_parameter(root_2);
-            const std::pair<float, float> uv = this->uv_at(point, r.time);
-            return hit_record{ root_2, point, (point - this->center_at_time(r.time)) / radius, this->mat.get(), uv };
+            const position point = ray.point_at_parameter(root_2);
+            const std::pair<float, float> uv = this->uv_at(point, ray.time);
+            return hit_record{ root_2, point, (point - this->center_at_time(ray.time)) / this->radius, this->mat.get(), uv };
         }
     }
     return {};
@@ -71,7 +71,7 @@ position sphere::center_at_time(const float time) const
 
 std::pair<float, float> sphere::uv_at(const position& p, const float time) const
 {
-    const displacement normalized_p = this->inverse_radius * (p - this->center_at_time(time));
+    const displacement normalized_p = glm::abs(this->inverse_radius) * (p - this->center_at_time(time));
     return std::make_pair(
         1.f - (glm::atan(normalized_p.z, normalized_p.x) + glm::pi<float>()) * glm::one_over_two_pi<float>(),
         (glm::asin(normalized_p.y) + glm::half_pi<float>()) * glm::one_over_pi<float>());

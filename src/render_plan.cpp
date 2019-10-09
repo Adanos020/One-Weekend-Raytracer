@@ -24,9 +24,10 @@ render_plan render_plan::random_balls(const extent_2d<uint32_t>& image_size)
         { 0.f, 1.f }
     };
 
-    scene w;
-    w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f, std::make_unique<lambertian>(
-        std::make_unique<checker_texture>(10.f, random_color(), random_color())));
+    scene world{ std::make_unique<image_texture>("textures/sky.jpg") };
+    world.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f, std::make_unique<lambertian>(
+        std::make_unique<noise_texture>(20.f, color{ 1.f, 1.f, 0.7f },
+        [](const perlin& n, const glm::vec3& p) { return 0.5f * (1 + turbulence(n, p)); })));
 
     for (int32_t a = -11; a < 11; ++a)
     {
@@ -70,26 +71,26 @@ render_plan render_plan::random_balls(const extent_2d<uint32_t>& image_size)
 
                 if (random_chance(0.5f))
                 {
-                    w.spawn_object<sphere>(
+                    world.spawn_object<sphere>(
                         from_to<position>(center + displacement{ 0.f, random_uniform(0.1f, 0.3f), 0.f }, center),
                         min_max<float>(0.f, 1.f), 0.2f, std::move(mat));
                 }
                 else
                 {
-                    w.spawn_object<sphere>(center, 0.2f, std::move(mat));
+                    world.spawn_object<sphere>(center, 0.2f, std::move(mat));
                 }
             }
         }
     }
 
-    w.spawn_object<sphere>(position{ 4.f, 1.f, 0.f }, 1.f,
+    world.spawn_object<sphere>(position{ 4.f, 1.f, 0.f }, 1.f,
         std::make_unique<lambertian>(std::make_unique<image_texture>("textures/earth.jpg")));
-    w.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, 1.f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
-    w.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, -0.9f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
-    w.spawn_object<sphere>(position{ -4.f, 1.f, 0.f }, 1.f, std::make_unique<metal>(
+    world.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, 1.f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
+    world.spawn_object<sphere>(position{ 0.f, 1.f, 0.f }, -0.9f, std::make_unique<dielectric>(color{ 1.f }, 1.5f));
+    world.spawn_object<sphere>(position{ -4.f, 1.f, 0.f }, 1.f, std::make_unique<metal>(
         std::make_unique<noise_texture>(3.f, color{ 0.7f, 0.6f, 0.5f }), 0.f));
 
-    return render_plan{ image_size, cam, std::move(w) };
+    return render_plan{ image_size, cam, std::move(world) };
 }
 
 render_plan render_plan::two_noise_spheres(const extent_2d<uint32_t>& image_size)
@@ -104,15 +105,15 @@ render_plan render_plan::two_noise_spheres(const extent_2d<uint32_t>& image_size
         { 0.f, 1.f }
     };
 
-    scene w;
-    w.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f,
+    scene world;
+    world.spawn_object<sphere>(position{ 0.f, -1000.f, 0.f }, 1000.f,
         std::make_unique<lambertian>(std::make_unique<noise_texture>(3.f, color{ 1.f },
             [](const perlin& n, const glm::vec3& p) { return turbulence(n, p); })));
-    w.spawn_object<sphere>(position{ 0.f, 2.f, 0.f }, 2.f,
+    world.spawn_object<sphere>(position{ 0.f, 2.f, 0.f }, 2.f,
         std::make_unique<lambertian>(std::make_unique<noise_texture>(2.f, color{ 1.f },
             [](const perlin& n, const glm::vec3& p) { return 0.5f * (1.f + glm::sin(p.z + 10.f * turbulence(n, p))); })));
 
-    return render_plan{ image_size, cam, std::move(w) };
+    return render_plan{ image_size, cam, std::move(world) };
 }
 
 render_plan render_plan::space(const extent_2d<uint32_t>& image_size)
@@ -127,15 +128,13 @@ render_plan render_plan::space(const extent_2d<uint32_t>& image_size)
         { 0.f, 1.f }
     };
 
-    scene w;
-    w.spawn_object<sphere>(position{ 0.f, 0.f, 0.f }, 10000.f,
-        std::make_unique<lambertian>(std::make_unique<image_texture>("textures/stars_milky_way.jpg")));
-    w.spawn_object<sphere>(position{ 0.f, 0.f, 0.f }, 5.f,
+    scene world{ std::make_unique<image_texture>("textures/stars_milky_way.jpg") };
+    world.spawn_object<sphere>(position{ 0.f, 0.f, 0.f }, 5.f,
         std::make_unique<diffuse_light>(std::make_unique<image_texture>("textures/sun.jpg")));
-    w.spawn_object<sphere>(position{ 8.f, 0.f, -8.f }, 1.f,
+    world.spawn_object<sphere>(position{ 8.f, 0.f, -8.f }, 1.f,
         std::make_unique<lambertian>(std::make_unique<image_texture>("textures/earth.jpg")));
-    w.spawn_object<sphere>(position{ 8.f, 0.f, -8.f }, 1.025f,
+    world.spawn_object<sphere>(position{ 8.f, 0.f, -8.f }, 1.025f,
         std::make_unique<dielectric>(std::make_unique<image_texture>("textures/earth_clouds.png"), 1.000293f));
 
-    return { image_size, cam, std::move(w) };
+    return render_plan{ image_size, cam, std::move(world) };
 }

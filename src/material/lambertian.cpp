@@ -21,11 +21,11 @@ lambertian::lambertian(unique_texture&& albedo)
     }
 }
 
-scattering_opt lambertian::scatter(const ray& r, const hit_record& hit) const
+scattering_opt lambertian::scatter(const line& ray, const hit_record& hit) const
 {
     const position target = hit.point + hit.normal + random_direction();
     return scattering{
         this->albedo->value_at(hit.uv, hit.point),
-        ray{ hit.point, target - hit.point, r.time }
+        line{ hit.point, target - hit.point, ray.time }
     };
 }

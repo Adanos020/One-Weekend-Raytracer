@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ray.hpp>
+#include <line.hpp>
 #include <util/types.hpp>
 
 #include <memory>
@@ -9,7 +9,7 @@
 struct scattering
 {
     color attenuation;
-    ray scattered_ray;
+    line scattered_ray;
 };
 
 using scattering_opt = std::optional<scattering>;
@@ -18,7 +18,7 @@ class material
 {
 public:
     virtual ~material() = default;
-    virtual scattering_opt scatter(const ray&, const struct hit_record&) const = 0;
+    virtual scattering_opt scatter(const line&, const struct hit_record&) const = 0;
     virtual color emitted(const std::pair<float, float> uv, const position&) const;
 };
 

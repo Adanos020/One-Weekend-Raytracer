@@ -12,7 +12,7 @@ diffuse_light::diffuse_light(unique_texture&& emit)
 {
 }
 
-scattering_opt diffuse_light::scatter(const ray& r, const struct hit_record& hit) const
+scattering_opt diffuse_light::scatter(const line& ray, const struct hit_record& hit) const
 {
     return {};
 }

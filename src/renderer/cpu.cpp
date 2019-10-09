@@ -1,6 +1,6 @@
 #include <renderer/cpu.hpp>
 
-#include <ray.hpp>
+#include <line.hpp>
 #include <util/random.hpp>
 
 #include <iomanip>
@@ -50,7 +50,7 @@ std::vector<rgb> cpu_renderer::render_fragment(const render_plan* plan, const gl
     const float inverse_sample_count = 1.f / sample_count;
 
     std::vector<rgb> image_fragment;
-    image_fragment.reserve(size_t(width) * height);
+    image_fragment.reserve(size_t(width) * size_t(height));
 
     for (uint32_t y = top_left.y; y < bottom_right.y; ++y)
     {
@@ -61,14 +61,13 @@ std::vector<rgb> cpu_renderer::render_fragment(const render_plan* plan, const gl
             {
                 const float u = float(x + random_uniform(0.f, 1.f)) * inverse_image_width;
                 const float v = float(plan->image_size.height - y + random_uniform(0.f, 1.f)) * inverse_image_height;
-                const ray r = plan->cam.shoot_ray_at(u, v);
-                col += r.seen_color(plan->world, 0);
+                const line ray = plan->cam.shoot_ray_at(u, v);
+                col += ray.seen_color(*plan);
             }
             col *= inverse_sample_count;
             col = { glm::sqrt(col.r), glm::sqrt(col.g), glm::sqrt(col.b) };
-            col *= 255.99f;
 
-            image_fragment.push_back({ uint8_t(col.r), uint8_t(col.g), uint8_t(col.b) });
+            image_fragment.push_back(rgb{ col * 255.99f });
         }
 
         std::lock_guard lock{ this->progress_mtx };

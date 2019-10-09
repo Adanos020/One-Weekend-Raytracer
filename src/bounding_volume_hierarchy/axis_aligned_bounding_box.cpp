@@ -1,6 +1,6 @@
 #include <bounding_volume_hierarchy/axis_aligned_bounding_box.hpp>
 
-#include <ray.hpp>
+#include <line.hpp>
 
 #include <algorithm>
 
@@ -18,23 +18,23 @@ axis_aligned_bounding_box axis_aligned_bounding_box::surrounding(
     return axis_aligned_bounding_box{ top_left_back, bottom_right_front };
 }
 
-bool axis_aligned_bounding_box::hit(const ray& r, min_max<float> time) const
+bool axis_aligned_bounding_box::hit(const line& ray, min_max<float> time) const
 {
     const min_max<float> tx = {
-        (this->min.x - r.origin.x) * r.inverse_direction.x,
-        (this->max.x - r.origin.x) * r.inverse_direction.x };
+        (this->min.x - ray.origin.x) * ray.inverse_direction.x,
+        (this->max.x - ray.origin.x) * ray.inverse_direction.x };
     min_max<float> t = std::minmax(tx.min, tx.max);
 
     const min_max<float> ty = {
-        (this->min.y - r.origin.y) * r.inverse_direction.y,
-        (this->max.y - r.origin.y) * r.inverse_direction.y };
+        (this->min.y - ray.origin.y) * ray.inverse_direction.y,
+        (this->max.y - ray.origin.y) * ray.inverse_direction.y };
     t = {
         std::max(t.min, std::min(ty.min, ty.max)),
         std::min(t.max, std::max(ty.min, ty.max)) };
 
     const min_max<float> tz = {
-        (this->min.z - r.origin.z) * r.inverse_direction.z,
-        (this->max.z - r.origin.z) * r.inverse_direction.z };
+        (this->min.z - ray.origin.z) * ray.inverse_direction.z,
+        (this->max.z - ray.origin.z) * ray.inverse_direction.z };
     t = {
         std::max(t.min, std::min(tz.min, tz.max)),
         std::min(t.max, std::max(tz.min, tz.max)) };

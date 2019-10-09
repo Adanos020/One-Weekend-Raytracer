@@ -7,25 +7,32 @@
 #include <stb_image_write.h>
 
 #include <iostream>
+#include <string>
 
-void export_image(const std::vector<rgb>& image, const extent_2d<uint32_t> image_size, const std::string_view path)
+using namespace std::string_literals;
+
+void export_image(const std::vector<rgb>& image, const extent_2d<uint32_t> image_size,
+    const std::string_view path)
 {
     std::cout << "Writing to file... ";
 
     static const uint32_t channels = 3;
     if (string_ends_with(path, ".png"))
     {
-        stbi_write_png(path.data(), image_size.width, image_size.height, channels, image.data(), image_size.width * channels);
+        stbi_write_png(path.data(), image_size.width, image_size.height, channels,
+            image.data(), image_size.width * channels);
     }
     else if (string_ends_with(path, ".jpg"))
     {
         static const int32_t quality = 100;
-        stbi_write_jpg(path.data(), image_size.width, image_size.height, channels, image.data(), quality);
+        stbi_write_jpg(path.data(), image_size.width, image_size.height, channels,
+            image.data(), quality);
     }
     else
     {
         const size_t last_dot_pos = path.find_last_of('.');
-        std::cerr << "Unsupported image format: " << path.substr(last_dot_pos + 1, path.size() - last_dot_pos - 1) << std::endl;
+        const std::string_view format = path.substr(last_dot_pos + 1, path.size() - last_dot_pos - 1);
+        throw std::runtime_error("Unsupported image format: "s + format.data());
     }
 
     std::cout << "Done." << std::endl;
@@ -36,7 +43,7 @@ int main()
     try
     {
         const extent_2d<uint32_t> image_size = { 1600, 900 };
-        const render_plan plan = render_plan::space(image_size);
+        const render_plan plan = render_plan::random_balls(image_size);
         const std::vector<rgb> image = cpu_renderer{ 500, 20 }.render_scene(plan);
         export_image(image, image_size, "image.png");
     }

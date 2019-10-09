@@ -12,7 +12,7 @@ public:
 
     static axis_aligned_bounding_box surrounding(const axis_aligned_bounding_box&, const axis_aligned_bounding_box&);
 
-    bool hit(const struct ray&, min_max<float> t) const;
+    bool hit(const struct line&, min_max<float> t) const;
 };
 
 using axis_aligned_bounding_box_opt = std::optional<axis_aligned_bounding_box>;

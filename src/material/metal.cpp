@@ -15,10 +15,10 @@ metal::metal(unique_texture&& albedo, const float fuzz)
 {
 }
 
-scattering_opt metal::scatter(const ray& r, const hit_record& hit) const
+scattering_opt metal::scatter(const line& ray, const hit_record& hit) const
 {
-    const displacement reflected = glm::reflect(glm::normalize(r.direction), hit.normal);
-    const ray scattered = { hit.point, reflected + (fuzz * random_direction()), r.time };
+    const displacement reflected = glm::reflect(glm::normalize(ray.direction), hit.normal);
+    const line scattered = { hit.point, reflected + (fuzz * random_direction()), ray.time };
     if (glm::dot(scattered.direction, hit.normal) > 0.f)
     {
         return scattering{ this->albedo->value_at(hit.uv, hit.point), scattered };
