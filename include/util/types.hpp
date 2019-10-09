@@ -6,10 +6,15 @@
 
 using position = glm::vec3;
 using displacement = glm::vec3;
-using axis = glm::vec3;
 using color = glm::vec3;
+using color_alpha = glm::vec4;
 using rgb = glm::u8vec3;
 using rgba = glm::u8vec4;
+
+using axis = glm::vec3;
+static constexpr axis x_axis = { 1.f, 0.f, 0.f };
+static constexpr axis y_axis = { 0.f, 1.f, 0.f };
+static constexpr axis z_axis = { 0.f, 0.f, 1.f };
 
 template <typename T>
 struct extent_2d
@@ -20,6 +25,11 @@ struct extent_2d
     constexpr extent_2d(const T width, const T height)
         : width(width), height(height)
     {
+    }
+
+    constexpr float aspect() const
+    {
+        return float(this->width) / float(this->height);
     }
 
     T width = T{};

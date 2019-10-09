@@ -1,15 +1,16 @@
 #pragma once
 
 #include <material.hpp>
-#include <util/types.hpp>
+#include <texture.hpp>
 
 class metal : public material
 {
 public:
-    metal(const color& albedo, const float fuzz);
+    metal(const color&, const float fuzz);
+    metal(unique_texture&&, const float fuzz);
     virtual scattering_opt scatter(const ray&, const struct hit_record&) const override;
 
 public:
-    color albedo;
+    unique_texture albedo;
     float fuzz;
 };

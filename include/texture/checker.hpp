@@ -6,6 +6,7 @@ class checker_texture : public texture
 {
 public:
     checker_texture() = default;
+    checker_texture(const float scale, const color& odd, const color& even);
     checker_texture(const float scale, unique_texture&& odd, unique_texture&& even);
 
     virtual color value_at(const std::pair<float, float> uv, const position&) const override;

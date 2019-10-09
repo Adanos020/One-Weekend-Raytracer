@@ -1,6 +1,15 @@
 #include <texture/checker.hpp>
 
+#include <texture/constant.hpp>
+
 #include <stdexcept>
+
+checker_texture::checker_texture(const float scale, const color& odd, const color& even)
+    : scale(scale)
+    , odd(std::make_unique<constant_texture>(odd))
+    , even(std::make_unique<constant_texture>(even))
+{
+}
 
 checker_texture::checker_texture(const float scale, unique_texture&& odd, unique_texture&& even)
     : scale(scale), odd(std::move(odd)), even(std::move(even))

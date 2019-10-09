@@ -53,11 +53,11 @@ inline static displacement random_direction()
     }
 }
 
-inline static displacement random_in_unit_disk(const axis& ax = { 0.f, 0.f, 1.f })
+inline static displacement random_in_unit_disk(const axis& ax = z_axis)
 {
     while (true)
     {
-        if (const displacement dir = (axis{ 1.f } -ax) * random_direction();
+        if (const displacement dir = (axis{ 1.f } - ax) * random_direction();
             glm::dot(dir, dir) < 1.f)
         {
             return dir;

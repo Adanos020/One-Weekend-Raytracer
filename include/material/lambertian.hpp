@@ -7,7 +7,8 @@
 class lambertian : public material
 {
 public:
-    lambertian(unique_texture&& albedo);
+    lambertian(const color&);
+    lambertian(unique_texture&&);
     virtual scattering_opt scatter(const ray&, const struct hit_record&) const override;
 
 public:

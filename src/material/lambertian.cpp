@@ -2,9 +2,15 @@
 
 #include <hittable.hpp>
 #include <shape/sphere.hpp>
+#include <texture/constant.hpp>
 #include <util/random.hpp>
 
 #include <stdexcept>
+
+lambertian::lambertian(const color& albedo)
+    : albedo(std::make_unique<constant_texture>(albedo))
+{
+}
 
 lambertian::lambertian(unique_texture&& albedo)
     : albedo(std::move(albedo))

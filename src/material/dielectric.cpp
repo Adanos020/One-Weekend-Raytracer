@@ -1,11 +1,18 @@
 #include <material/dielectric.hpp>
 
 #include <hittable.hpp>
+#include <texture/constant.hpp>
 #include <util/random.hpp>
 
 dielectric::dielectric(const color& albedo, const float refractive_index)
     : refractive_index(refractive_index)
-    , albedo(albedo)
+    , albedo(std::make_unique<constant_texture>(albedo))
+{
+}
+
+dielectric::dielectric(unique_texture&& albedo, const float refractive_index)
+    : refractive_index(refractive_index)
+    , albedo(std::move(albedo))
 {
 }
 
@@ -25,11 +32,12 @@ scattering_opt dielectric::scatter(const ray& r, const hit_record& hit) const
         ? schlick(cosine, this->refractive_index)
         : 1.f;
 
+    const color col = this->albedo->value_at(hit.uv, hit.point);
     if (random_chance(reflect_probability))
     {
-        return scattering{ albedo, ray{ hit.point, reflected, r.time } };
+        return scattering{ col, ray{ hit.point, reflected, r.time } };
     }
-    return scattering{ albedo, ray{ hit.point, refracted, r.time } };
+    return scattering{ col, ray{ hit.point, refracted, r.time } };
 }
 
 float dielectric::schlick(const float cosine, const float refractive_index)

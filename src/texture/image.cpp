@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#pragma clang optimize off
+
 image_texture::image_texture(const std::vector<color>& data, const extent_2d<size_t> size)
     : data(data), size(size)
 {
@@ -17,15 +19,19 @@ image_texture::image_texture(const std::vector<color>& data, const extent_2d<siz
 
 image_texture::image_texture(std::string_view image_path)
 {
-    int width, height, n;
-    uint8_t* data = stbi_load(image_path.data(), &width, &height, &n, 0);
+    int width, height, channels;
+    uint8_t* data = stbi_load(image_path.data(), &width, &height, &channels, STBI_rgb_alpha);
     this->size = extent_2d<size_t>{ size_t(width), size_t(height) };
 
     const float normalized_rgb = 1.f / 255.f;
     this->data.resize(size_t(width) * height);
     for (size_t i = 0; i < size_t(width) * height; ++i)
     {
-        this->data[i] = normalized_rgb * color{ data[3 * i + 0], data[3 * i + 1], data[3 * i + 2] };
+        this->data[i] = normalized_rgb * color{
+            data[4 * i + 0],
+            data[4 * i + 1],
+            data[4 * i + 2],
+        };
     }
 
     stbi_image_free(data);

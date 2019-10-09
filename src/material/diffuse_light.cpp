@@ -1,5 +1,12 @@
 #include <material/diffuse_light.hpp>
 
+#include <texture/constant.hpp>
+
+diffuse_light::diffuse_light(const color& emit)
+    : emit(std::make_unique<constant_texture>(emit))
+{
+}
+
 diffuse_light::diffuse_light(unique_texture&& emit)
     : emit(std::move(emit))
 {

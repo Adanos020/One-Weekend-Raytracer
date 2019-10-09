@@ -29,7 +29,8 @@ color ray::seen_color(const scene& w, const int32_t depth) const
         }
         return color{};
     }
-    const displacement unit_direction = glm::normalize(this->direction);
-    const float t = 0.5f * (unit_direction.y + 1.f);
-    return (1.f - t) * color{ 1.f, 1.f, 1.f } + t * color{ 0.5f, 0.7f, 1.f };
+//    const displacement unit_direction = glm::normalize(this->direction);
+//    const float t = 0.5f * (unit_direction.y + 1.f);
+//    return (1.f - t) * color{ 1.f, 1.f, 1.f } + t * color{ 0.5f, 0.7f, 1.f };
+    return color{ 1.f };
 }
