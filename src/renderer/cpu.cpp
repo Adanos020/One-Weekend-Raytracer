@@ -62,7 +62,7 @@ std::vector<rgb> cpu_renderer::render_fragment(const render_plan* plan, const gl
                 const float u = float(x + random_uniform(0.f, 1.f)) * inverse_image_width;
                 const float v = float(plan->image_size.height - y + random_uniform(0.f, 1.f)) * inverse_image_height;
                 const line ray = plan->cam.shoot_ray_at(u, v);
-                col += ray.seen_color(*plan);
+                col += ray.seen_color(plan->world);
             }
             col *= inverse_sample_count;
             col = { glm::sqrt(col.r), glm::sqrt(col.g), glm::sqrt(col.b) };
