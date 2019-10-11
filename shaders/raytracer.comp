@@ -151,30 +151,39 @@ layout(set = 0, binding = 0) buffer Image
 	RGBA pixels[];
 } outImage;
 
-// layout(set = 0, binding = 1) readonly uniform Scene
-// {
-// 	Shape shapes[];
-// 	SphereShape sphereShapes[];
-// 
-// 	DielectricMaterial dielectricMaterials[];
-// 	DiffuseLightMaterial diffuseLightMaterials[];
-// 	LambertianMaterial lambertianMaterials[];
-// 	MetalMaterial metalMaterials[];
-// 
-// 	CheckerTexture checkerTextures[];
-// 	ConstantTexture constantTextures[];
-// 	ImageTexture imageTextures[];
-// 	NoiseTexture noiseTextures[];
-// 
-// 	Texture sky;
-// 	Camera camera;
-// } scene;
-// 
+layout(set = 0, binding = 1) readonly uniform Scene
+{
+	Shape shapes[];
+	SphereShape sphereShapes[];
+
+	DielectricMaterial dielectricMaterials[];
+	DiffuseLightMaterial diffuseLightMaterials[];
+	LambertianMaterial lambertianMaterials[];
+	MetalMaterial metalMaterials[];
+
+	CheckerTexture checkerTextures[];
+	ConstantTexture constantTextures[];
+	ImageTexture imageTextures[];
+	NoiseTexture noiseTextures[];
+
+	Texture sky;
+	Camera camera;
+} scene;
+
 // layout(set = 0, binding = 2) uniform sampler2D textureImages[];
 
 // Ray Tracer
 
 void main()
 {
-	outImage.pixels[gl_GlobalInvocationID.x] = 0xffff0000;
+	const vec3 color = vec3(
+		0.5 * (1 + sin(radians(gl_GlobalInvocationID.x))),
+		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y))),
+		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y)) * sin(radians(gl_GlobalInvocationID.x))));
+
+	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 1600;
+	outImage.pixels[pixelIndex] =
+		(uint(color.r * 255) <<  0) |
+		(uint(color.g * 255) <<  8) |
+		(uint(color.b * 255) << 16) | 0xff000000;
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <render_plan.hpp>
 #include <util/types.hpp>
 
 #include <vulkan/vulkan.hpp>
@@ -11,7 +10,7 @@ class vulkan_renderer
 {
 public:
     vulkan_renderer(const uint32_t sample_count);
-    std::vector<rgba> render_scene(const render_plan&);
+    std::vector<rgba> render_scene(const class render_plan&);
 
 private:
     void create_buffer_and_memory(const vk::DeviceSize, const vk::BufferUsageFlags,

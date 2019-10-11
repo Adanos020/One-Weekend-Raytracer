@@ -1,4 +1,5 @@
 #include <renderer/vulkan.hpp>
+#include <render_plan.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -93,11 +94,11 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
             .setDescriptorType(vk::DescriptorType::eStorageBuffer)
             .setDescriptorCount(1)
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-//         vk::DescriptorSetLayoutBinding{} // scene
-//             .setBinding(1)
-//             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-//             .setDescriptorCount(1)
-//             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+        vk::DescriptorSetLayoutBinding{} // scene
+            .setBinding(1)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
 //         vk::DescriptorSetLayoutBinding{} // textureImages
 //             .setBinding(2)
 //             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
@@ -125,6 +126,9 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
         vk::DescriptorPoolSize{}
             .setType(vk::DescriptorType::eStorageBuffer)
+            .setDescriptorCount(1),
+        vk::DescriptorPoolSize{}
+            .setType(vk::DescriptorType::eUniformBuffer)
             .setDescriptorCount(1),
     };
 
@@ -161,16 +165,18 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
         image_buffer, image_buffer_memory);
 
-    const auto descriptor_buffer_info = vk::DescriptorBufferInfo{}
-        .setBuffer(*image_buffer)
-        .setRange(VK_WHOLE_SIZE);
+    const std::vector<vk::DescriptorBufferInfo> descriptor_buffers_info = {
+        vk::DescriptorBufferInfo{}
+            .setBuffer(*image_buffer)
+            .setRange(VK_WHOLE_SIZE),
+    };
 
-    for (vk::UniqueDescriptorSet& descriptor_set : this->descriptor_sets)
+    for (size_t i = 0; i < this->descriptor_sets.size(); ++i)
     {
         this->device->updateDescriptorSets(vk::WriteDescriptorSet{}
-            .setDstSet(*descriptor_set)
+            .setDstSet(*this->descriptor_sets[i])
             .setDescriptorType(vk::DescriptorType::eStorageBuffer)
-            .setPBufferInfo(&descriptor_buffer_info), nullptr);
+            .setPBufferInfo(&descriptor_buffers_info[i]), nullptr);
     }
 
     std::cout << "Done." << std::endl;
@@ -194,7 +200,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
         command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eCompute, *this->pipeline_layout, 0,
             1, &*this->descriptor_sets[i],
             0, {});
-        command_buffer->dispatch(plan.image_size.width * plan.image_size.height, 1, 1);
+        command_buffer->dispatch(plan.image_size.width, plan.image_size.height, 1);
         command_buffer->end();
 
         this->compute_queue.submit(vk::SubmitInfo{}
