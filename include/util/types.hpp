@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 
+#include <iterator>
 #include <utility>
 
 using position = glm::vec3;
@@ -115,7 +116,7 @@ struct const_iterator_pair
     }
 
     const_iterator_pair(const T& container)
-        : iterator_pair(std::cbegin(container), std::cend(container))
+        : const_iterator_pair(std::cbegin(container), std::cend(container))
     {
     }
 };
