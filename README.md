@@ -2,3 +2,5 @@
 My implementation of the path tracer from the tutorial [line Tracing In One Weekend](https://github.com/RayTracing/raytracing.github.io).
 
 ![Last rendered image](image.png)
+
+![Same scene but at night](image_night.png)

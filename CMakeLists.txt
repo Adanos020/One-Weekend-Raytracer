@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1...3.13)
+cmake_minimum_required(VERSION 3.7...3.13)
 
 project(One-Weekend-Raytracer)
 
@@ -16,5 +16,6 @@ if(UNIX)
 	target_link_libraries(One-Weekend-Raytracer PUBLIC pthread)
 elseif(WIN32)
 	find_package(glm CONFIG REQUIRED)
-	target_link_libraries(One-Weekend-Raytracer PRIVATE glm)
+	find_package(Vulkan REQUIRED)
+	target_link_libraries(One-Weekend-Raytracer PRIVATE glm Vulkan::Vulkan)
 endif()

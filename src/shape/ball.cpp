@@ -1,15 +1,14 @@
-#include <shape/sphere.hpp>
+#include <shape/ball.hpp>
 
 #include <line.hpp>
+#include <math/sphere.hpp>
 
-#include <glm/gtc/constants.hpp>
-
-sphere::sphere(const position& center, const float radius, unique_material&& mat)
-    : sphere({ center, center }, { 0.f, 0.f }, radius, std::move(mat))
+ball::ball(const position& center, const float radius, unique_material&& mat)
+    : ball({ center, center }, { 0.f, 0.f }, radius, std::move(mat))
 {
 }
 
-sphere::sphere(const from_to<position>& center_transition, const min_max<float> time_transition,
+ball::ball(const from_to<position>& center_transition, const min_max<float> time_transition,
     const float radius, unique_material&& mat)
     : center_transition(center_transition)
     , time_transition(time_transition)
@@ -23,7 +22,7 @@ sphere::sphere(const from_to<position>& center_transition, const min_max<float> 
     }
 }
 
-hit_record_opt sphere::hit(const line& ray, const min_max<float> t) const
+hit_record_opt ball::hit(const line& ray, const min_max<float> t) const
 {
     const displacement oc = ray.origin - this->center_at_time(ray.time);
     const float a = glm::dot(ray.direction, ray.direction);
@@ -49,7 +48,7 @@ hit_record_opt sphere::hit(const line& ray, const min_max<float> t) const
     return {};
 }
 
-axis_aligned_bounding_box_opt sphere::bounding_box(const min_max<float> t) const
+axis_aligned_bounding_box_opt ball::bounding_box(const min_max<float> t) const
 {
     const float r = glm::abs(this->radius);
     return axis_aligned_bounding_box::surrounding(
@@ -61,7 +60,7 @@ axis_aligned_bounding_box_opt sphere::bounding_box(const min_max<float> t) const
             position{ this->center_transition.to + displacement{ r } } });
 }
 
-position sphere::center_at_time(const float time) const
+position ball::center_at_time(const float time) const
 {
     const position from = this->center_transition.from;
     const position to = this->center_transition.to;
@@ -69,10 +68,7 @@ position sphere::center_at_time(const float time) const
     return from + ((time - t_min) * this->inverse_time_interval) * (to - from);
 }
 
-std::pair<float, float> sphere::uv_at(const position& p, const float time) const
+std::pair<float, float> ball::uv_at(const position& p, const float time) const
 {
-    const displacement normalized_p = glm::abs(this->inverse_radius) * (p - this->center_at_time(time));
-    return std::make_pair(
-        1.f - (glm::atan(normalized_p.z, normalized_p.x) + glm::pi<float>()) * glm::one_over_two_pi<float>(),
-        (glm::asin(normalized_p.y) + glm::half_pi<float>()) * glm::one_over_pi<float>());
+    return uv_on_sphere(glm::abs(this->inverse_radius) * (p - this->center_at_time(time)));
 }

@@ -10,10 +10,10 @@ class cpu_renderer
 {
 public:
     cpu_renderer(const uint32_t sample_count, const uint32_t thread_count);
-    std::vector<rgb> render_scene(const render_plan&);
+    std::vector<rgba> render_scene(const render_plan&);
 
 private:
-    std::vector<rgb> render_fragment(const render_plan*, const glm::uvec2 top_left, const glm::uvec2 bottom_right);
+    std::vector<rgba> render_fragment(const render_plan*, const glm::uvec2 top_left, const glm::uvec2 bottom_right);
 
 private:
     const uint32_t sample_count;

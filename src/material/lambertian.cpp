@@ -1,7 +1,7 @@
 #include <material/lambertian.hpp>
 
 #include <hittable.hpp>
-#include <shape/sphere.hpp>
+#include <shape/ball.hpp>
 #include <texture/constant.hpp>
 #include <util/random.hpp>
 

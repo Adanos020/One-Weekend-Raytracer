@@ -8,8 +8,8 @@ using position = glm::vec3;
 using displacement = glm::vec3;
 using color = glm::vec3;
 using color_alpha = glm::vec4;
-using rgb = glm::u8vec3;
-using rgba = glm::u8vec4;
+using rgb = glm::uvec3;
+using rgba = glm::uvec4;
 
 using axis = glm::vec3;
 static constexpr axis x_axis = { 1.f, 0.f, 0.f };

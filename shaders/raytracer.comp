@@ -1,0 +1,180 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+// Indices
+
+#define ArrayIndex uint
+
+// Sizes
+
+struct FloatExtent2D
+{
+	float width;
+	float height;
+};
+
+struct UintExtent2D
+{
+	uint width;
+	uint height;
+};
+
+// Vector types
+
+#define Position vec3		// Represents arbitrary point in space.
+#define Displacement vec3	// Represents a transmission from one point to another.
+#define Direction vec3		// Represents a direction, must be a unit vector.
+
+const Direction X_AXIS = Direction(1, 0, 0);
+const Direction Y_AXIS = Direction(0, 1, 0);
+const Direction Z_AXIS = Direction(0, 0, 1);
+
+// Colors
+
+#define Color vec3		// Normalized color.
+#define ColorAlpha vec4	// Normalized color with an alpha channel.
+#define RGBA uint		// RGBA color representation with integer values between 0 and 255.
+
+// Textures
+
+#define TextureTypeID uint
+
+const TextureTypeID TEXTURE_TYPE_CHECKER  = 1;
+const TextureTypeID TEXTURE_TYPE_CONSTANT = 2;
+const TextureTypeID TEXTURE_TYPE_IMAGE    = 3;
+const TextureTypeID TEXTURE_TYPE_NOISE    = 4;
+
+struct Texture
+{
+	TextureTypeID type;
+	ArrayIndex index;
+};
+
+struct CheckerTexture
+{
+	float scale;
+	Texture odd;
+	Texture even;
+};
+
+struct ConstantTexture
+{
+	Color value;
+};
+
+struct ImageTexture
+{
+	ArrayIndex imageIndex;
+	UintExtent2D size;
+};
+
+struct NoiseTexture
+{
+	float scale;
+	Color baseColor;
+};
+
+// Materials
+
+#define MaterialTypeID uint
+
+const MaterialTypeID MATERIAL_TYPE_DIELECTRIC    = 1;
+const MaterialTypeID MATERIAL_TYPE_DIFFUSE_LIGHT = 2;
+const MaterialTypeID MATERIAL_TYPE_LAMBERTIAN    = 3;
+const MaterialTypeID MATERIAL_TYPE_METAL	     = 4;
+
+struct Material
+{
+	TextureTypeID type;
+	ArrayIndex index;
+};
+
+struct DielectricMaterial
+{
+	float refractiveIndex;
+	Texture albedo;
+};
+
+struct DiffuseLightMaterial
+{
+	Texture emit;
+};
+
+struct LambertianMaterial
+{
+	Texture albedo;
+};
+
+struct MetalMaterial
+{
+	float fuzz;
+	Texture albedo;
+};
+
+// Shapes
+
+#define ShapeTypeID uint
+
+const ShapeTypeID SHAPE_TYPE_SPHERE = 1;
+
+struct Shape
+{
+	ShapeTypeID type;
+	ArrayIndex index;
+};
+
+struct SphereShape
+{
+	vec3 origin;
+	float radius;
+	Material material;
+};
+
+// Camera
+
+struct Camera
+{
+	Position origin;
+	Position lowerLeftCorner;
+	Position horizontal;
+	Position vertical;
+	Displacement w;
+	Displacement u;
+	Displacement v;
+	float lensRadius;
+};
+
+// I/O
+
+layout(set = 0, binding = 0) buffer Image
+{
+	RGBA pixels[];
+} outImage;
+
+// layout(set = 0, binding = 1) readonly uniform Scene
+// {
+// 	Shape shapes[];
+// 	SphereShape sphereShapes[];
+// 
+// 	DielectricMaterial dielectricMaterials[];
+// 	DiffuseLightMaterial diffuseLightMaterials[];
+// 	LambertianMaterial lambertianMaterials[];
+// 	MetalMaterial metalMaterials[];
+// 
+// 	CheckerTexture checkerTextures[];
+// 	ConstantTexture constantTextures[];
+// 	ImageTexture imageTextures[];
+// 	NoiseTexture noiseTextures[];
+// 
+// 	Texture sky;
+// 	Camera camera;
+// } scene;
+// 
+// layout(set = 0, binding = 2) uniform sampler2D textureImages[];
+
+// Ray Tracer
+
+void main()
+{
+	outImage.pixels[gl_GlobalInvocationID.x] = 0xffff0000;
+}

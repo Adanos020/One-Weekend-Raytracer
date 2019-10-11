@@ -1,5 +1,6 @@
 #include <render_plan.hpp>
 #include <renderer/cpu.hpp>
+#include <renderer/vulkan.hpp>
 #include <util/string.hpp>
 #include <util/types.hpp>
 
@@ -11,12 +12,12 @@
 
 using namespace std::string_literals;
 
-void export_image(const std::vector<rgb>& image, const extent_2d<uint32_t> image_size,
+void export_image(const std::vector<rgba>& image, const extent_2d<uint32_t> image_size,
     const std::string_view path)
 {
     std::cout << "Writing to file... ";
 
-    static const uint32_t channels = 3;
+    static const uint32_t channels = 4;
     if (string_ends_with(path, ".png"))
     {
         stbi_write_png(path.data(), image_size.width, image_size.height, channels,
@@ -44,8 +45,12 @@ int main()
     {
         const extent_2d<uint32_t> image_size = { 1600, 900 };
         const render_plan plan = render_plan::random_balls(image_size);
-        const std::vector<rgb> image = cpu_renderer{ 500, 20 }.render_scene(plan);
-        export_image(image, image_size, "image.png");
+
+        const std::vector<rgba> image = vulkan_renderer{ 1000 }.render_scene(plan);
+        export_image(image, image_size, "test.png");
+
+        //const std::vector<rgba> image = cpu_renderer{ 1000, 20 }.render_scene(plan);
+        //export_image(image, image_size, "image.png");
     }
     catch (const std::exception& e)
     {

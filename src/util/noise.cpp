@@ -1,6 +1,6 @@
 #include <util/noise.hpp>
 
-#include <util/interpolation.hpp>
+#include <math/interpolation.hpp>
 #include <util/random.hpp>
 
 #include <algorithm>

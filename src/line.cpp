@@ -1,6 +1,7 @@
 #include <line.hpp>
 
 #include <material.hpp>
+#include <math/sphere.hpp>
 #include <util/random.hpp>
 #include <render_plan.hpp>
 
@@ -30,8 +31,5 @@ color line::seen_color(const scene& world, const int32_t depth) const
             return emitted;
         }
     }
-    const displacement norm_direction = this->direction / glm::length(this->direction);
-    const float u = 1.f - (glm::atan(norm_direction.z, norm_direction.x) + glm::pi<float>()) * glm::one_over_two_pi<float>();
-    const float v = (glm::asin(norm_direction.y) + glm::half_pi<float>()) * glm::one_over_pi<float>();
-    return world.sky->value_at(std::make_pair(u, v), this->origin + this->direction);
+    return world.sky->value_at(uv_on_sphere(glm::normalize(this->direction)), this->origin + this->direction);
 }
