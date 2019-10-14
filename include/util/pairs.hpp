@@ -1,57 +1,7 @@
 #pragma once
 
-#include <glm/glm.hpp>
-
 #include <iterator>
 #include <utility>
-
-using position = glm::vec3;
-using displacement = glm::vec3;
-using color = glm::vec3;
-using color_alpha = glm::vec4;
-using rgb = glm::uvec3;
-using rgba = glm::uvec4;
-
-using axis = glm::vec3;
-static constexpr axis x_axis = { 1.f, 0.f, 0.f };
-static constexpr axis y_axis = { 0.f, 1.f, 0.f };
-static constexpr axis z_axis = { 0.f, 0.f, 1.f };
-
-template <typename T>
-struct extent_2d
-{
-    static_assert(std::is_arithmetic_v<T>);
-
-    constexpr extent_2d() = default;
-    constexpr extent_2d(const T width, const T height)
-        : width(width), height(height)
-    {
-    }
-
-    constexpr float aspect() const
-    {
-        return float(this->width) / float(this->height);
-    }
-
-    T width = T{};
-    T height = T{};
-};
-
-template <typename T>
-struct extent_3d
-{
-    static_assert(std::is_arithmetic_v<T>);
-
-    constexpr extent_3d() = default;
-    constexpr extent_3d(const T width, const T height, const T depth)
-        : width(width), height(height), depth(depth)
-    {
-    }
-
-    T width;
-    T height;
-    T depth;
-};
 
 template <typename T>
 struct min_max

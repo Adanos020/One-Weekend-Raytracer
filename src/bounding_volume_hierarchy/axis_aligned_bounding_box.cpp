@@ -1,6 +1,8 @@
 #include <bounding_volume_hierarchy/axis_aligned_bounding_box.hpp>
 
 #include <line.hpp>
+#include <util/pairs.hpp>
+#include <util/vector_types.hpp>
 
 #include <algorithm>
 

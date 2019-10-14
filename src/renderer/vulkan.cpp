@@ -154,7 +154,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 {
     std::cout << "Creating buffers... ";
 
-    std::vector<rgba> image{ plan.image_size.width * plan.image_size.height, rgba{ 0 } };
+    std::vector<rgba> image{ plan.image_size.width * plan.image_size.height, rgba{ 1 } };
 
     // Create image buffer
 

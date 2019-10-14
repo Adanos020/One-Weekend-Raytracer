@@ -34,13 +34,19 @@ transform& transform::scale_to(const glm::vec3& scale)
     return *this;
 }
 
+transform& transform::scale_to(const float scale)
+{
+    this->scale = glm::vec3{ scale };
+    return *this;
+}
+
 transform& transform::scale_by(const glm::vec3& scale)
 {
     this->scale *= scale;
     return *this;
 }
 
-transform& transform::scale_by(const float)
+transform& transform::scale_by(const float scale)
 {
     this->scale *= scale;
     return *this;

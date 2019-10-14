@@ -85,7 +85,7 @@ const MaterialTypeID MATERIAL_TYPE_METAL	     = 4;
 
 struct Material
 {
-	TextureTypeID type;
+	MaterialTypeID type;
 	ArrayIndex index;
 };
 
@@ -170,7 +170,7 @@ layout(set = 0, binding = 1) readonly uniform Scene
 	Camera camera;
 } scene;
 
-// layout(set = 0, binding = 2) uniform sampler2D textureImages[];
+layout(set = 0, binding = 2) uniform sampler2D textureImages[];
 
 // Ray Tracer
 

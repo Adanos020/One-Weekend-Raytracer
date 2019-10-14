@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-#pragma clang optimize off
-
 image_texture::image_texture(const std::vector<color>& data, const extent_2d<size_t> size)
     : data(data), size(size)
 {

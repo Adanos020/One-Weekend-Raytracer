@@ -2,7 +2,8 @@
 
 #include <hittable.hpp>
 #include <material.hpp>
-#include <util/types.hpp>
+#include <util/pairs.hpp>
+#include <util/vector_types.hpp>
 
 class ball : public hittable
 {

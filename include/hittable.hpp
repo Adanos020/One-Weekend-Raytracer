@@ -1,7 +1,7 @@
 #pragma once
 
 #include <bounding_volume_hierarchy/axis_aligned_bounding_box.hpp>
-#include <util/types.hpp>
+#include <util/pairs.hpp>
 
 #include <memory>
 #include <optional>

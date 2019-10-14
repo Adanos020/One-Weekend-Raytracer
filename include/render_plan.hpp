@@ -1,7 +1,7 @@
 #pragma once
 
 #include <camera.hpp>
-#include <util/types.hpp>
+#include <util/sizes.hpp>
 #include <scene.hpp>
 
 struct render_plan

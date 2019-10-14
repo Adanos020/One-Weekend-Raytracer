@@ -1,6 +1,7 @@
 #include <renderer/cpu.hpp>
 
 #include <line.hpp>
+#include <util/colors.hpp>
 #include <util/random.hpp>
 
 #include <iomanip>
@@ -59,15 +60,15 @@ std::vector<rgba> cpu_renderer::render_fragment(const render_plan* plan, const g
             color col{ 0.f };
             for (uint32_t s = 0; s < sample_count; ++s)
             {
-                const float u = float(x + random_uniform(0.f, 1.f)) * inverse_image_width;
-                const float v = float(plan->image_size.height - y + random_uniform(0.f, 1.f)) * inverse_image_height;
+                const float u = float(x + random_uniform<float>()) * inverse_image_width;
+                const float v = float(plan->image_size.height - y + random_uniform<float>()) * inverse_image_height;
                 const line ray = plan->cam.shoot_ray_at(u, v);
                 col += ray.seen_color(plan->world);
             }
             col *= inverse_sample_count;
             col = { glm::sqrt(col.r), glm::sqrt(col.g), glm::sqrt(col.b) };
 
-            image_fragment.push_back(rgba{ col * 255.99f, 255 });
+            image_fragment.push_back(rgba{ to_rgb(col), 255 });
         }
 
         std::lock_guard lock{ this->progress_mtx };

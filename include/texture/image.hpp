@@ -1,7 +1,7 @@
 #pragma once
 
 #include <texture.hpp>
-#include <util/types.hpp>
+#include <util/sizes.hpp>
 
 #include <string>
 #include <vector>

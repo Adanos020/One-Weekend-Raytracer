@@ -1,7 +1,7 @@
 #pragma once
 
 #include <render_plan.hpp>
-#include <util/types.hpp>
+#include <util/colors.hpp>
 
 #include <future>
 #include <vector>

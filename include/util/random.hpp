@@ -1,12 +1,13 @@
 #pragma once
 
-#include <util/types.hpp>
+#include <util/colors.hpp>
+#include <util/vector_types.hpp>
 
 #include <chrono>
 #include <random>
 #include <type_traits>
 
-inline static bool random_chance(const float probability)
+inline static bool random_chance(const float probability = 0.5f)
 {
     static const auto seed = uint32_t(std::chrono::system_clock::now().time_since_epoch().count());
     static std::default_random_engine rng{ seed };
@@ -36,7 +37,7 @@ inline static auto random_uniform(const T min = T(0), const T max = T(1))
 
 inline static color random_color()
 {
-    return color{ random_uniform(0.f, 1.f), random_uniform(0.f, 1.f), random_uniform(0.f, 1.f) };
+    return color{ random_uniform<float>(), random_uniform<float>(), random_uniform<float>() };
 }
 
 inline static displacement random_direction()
@@ -57,8 +58,7 @@ inline static displacement random_in_unit_disk(const axis& ax = z_axis)
 {
     while (true)
     {
-        if (const displacement dir = (axis{ 1.f } - ax) * random_direction();
-            glm::dot(dir, dir) < 1.f)
+        if (const displacement dir = (axis{ 1.f } - ax) * random_direction(); glm::dot(dir, dir) < 1.f)
         {
             return dir;
         }

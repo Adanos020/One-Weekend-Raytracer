@@ -1,6 +1,7 @@
 #include <bounding_volume_hierarchy/bounding_volume_hierarchy_node.hpp>
 
 #include <util/random.hpp>
+#include <util/pairs.hpp>
 
 #include <algorithm>
 #include <stdexcept>

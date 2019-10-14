@@ -3,6 +3,7 @@
 #include <hittable.hpp>
 #include <texture/constant.hpp>
 #include <util/random.hpp>
+#include <util/vector_types.hpp>
 
 dielectric::dielectric(const color& albedo, const float refractive_index)
     : refractive_index(refractive_index)

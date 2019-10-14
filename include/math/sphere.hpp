@@ -1,6 +1,6 @@
 #pragma once
 
-#include <util/types.hpp>
+#include <util/vector_types.hpp>
 
 #include <glm/gtc/constants.hpp>
 

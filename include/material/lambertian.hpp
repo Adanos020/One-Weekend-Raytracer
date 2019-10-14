@@ -2,7 +2,7 @@
 
 #include <material.hpp>
 #include <texture.hpp>
-#include <util/types.hpp>
+#include <util/colors.hpp>
 
 class lambertian : public material
 {

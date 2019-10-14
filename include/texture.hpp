@@ -1,6 +1,7 @@
 #pragma once
 
-#include <util/types.hpp>
+#include <util/colors.hpp>
+#include <util/vector_types.hpp>
 
 #include <memory>
 

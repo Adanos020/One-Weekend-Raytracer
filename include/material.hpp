@@ -1,7 +1,7 @@
 #pragma once
 
 #include <line.hpp>
-#include <util/types.hpp>
+#include <util/vector_types.hpp>
 
 #include <memory>
 #include <optional>

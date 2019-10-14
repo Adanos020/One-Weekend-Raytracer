@@ -27,7 +27,7 @@ hit_record_opt ball::hit(const line& ray, const min_max<float> t) const
     const displacement oc = ray.origin - this->center_at_time(ray.time);
     const float a = glm::dot(ray.direction, ray.direction);
     const float b = glm::dot(oc, ray.direction);
-    const float c = glm::dot(oc, oc) - this->radius * this->radius;
+    const float c = glm::dot(oc, oc) - glm::pow(this->radius, 2);
     const float discriminant = b * b - a * c;
 
     if (discriminant > 0.f)

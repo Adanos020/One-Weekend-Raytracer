@@ -1,6 +1,6 @@
 #pragma once
 
-#include <util/types.hpp>
+#include <util/vector_types.hpp>
 
 struct rotator
 {
@@ -40,6 +40,7 @@ struct transform
     transform& move_to(const position&);
     transform& move_by(const displacement&);
     transform& scale_to(const glm::vec3&);
+    transform& scale_to(const float);
     transform& scale_by(const glm::vec3&);
     transform& scale_by(const float);
     transform& rotate_to(const rotator&);
