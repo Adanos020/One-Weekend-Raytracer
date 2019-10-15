@@ -13,7 +13,7 @@ file(GLOB_RECURSE SOURCES
 add_executable(One-Weekend-Raytracer ${SOURCES})
 
 if(UNIX)
-	target_link_libraries(One-Weekend-Raytracer PUBLIC pthread)
+	target_link_libraries(One-Weekend-Raytracer PUBLIC pthread vulkan)
 elseif(WIN32)
 	find_package(glm CONFIG REQUIRED)
 	find_package(Vulkan REQUIRED)

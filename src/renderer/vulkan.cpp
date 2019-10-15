@@ -1,6 +1,5 @@
 #include <renderer/vulkan.hpp>
 #include <render_plan.hpp>
-#include <util/vk_mem_alloc.hpp>
 
 #include <fstream>
 #include <iostream>
