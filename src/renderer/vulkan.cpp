@@ -1,5 +1,6 @@
 #include <renderer/vulkan.hpp>
 #include <render_plan.hpp>
+#include <util/vk_mem_alloc.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -11,6 +12,23 @@
 using namespace std::string_literals;
 
 // Helpers
+
+inline static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+    {
+        std::cerr << "[ERR] " << pCallbackData->pMessage << std::endl;
+    }
+    else
+    {
+        std::cout << pCallbackData->pMessage << std::endl;
+    }
+    return VK_FALSE;
+}
 
 std::optional<uint32_t> find_compute_queue_family(const vk::PhysicalDevice& device)
 {
@@ -47,16 +65,37 @@ uint32_t find_memory_type(const vk::PhysicalDevice& physical_device, const uint3
 vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     : sample_count(sample_count)
 {
-    // Create instance
+    // Create instance and debug messenger
 
-    std::cout << "Initializing Vulkan... ";
+    using MsgSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using MsgType = vk::DebugUtilsMessageTypeFlagBitsEXT;
+
+    const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
+        .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
+        .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
+        .setPfnUserCallback(debug_callback);
+
+    const std::vector<const char*> extensions = {
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+    };
 
     const auto application_info = vk::ApplicationInfo{}
         .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
     this->vulkan_instance = vk::createInstanceUnique(vk::InstanceCreateInfo{}
-        .setPApplicationInfo(&application_info));
+        .setPApplicationInfo(&application_info)
+        .setPNext(&debug_messenger_info)
+        .setPpEnabledLayerNames(this->validation_layers.data())
+        .setEnabledLayerCount(this->validation_layers.size())
+        .setEnabledExtensionCount(extensions.size())
+        .setPpEnabledExtensionNames(extensions.data()));
+    this->dispatch.init(*this->vulkan_instance);
+
+    this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
+        debug_messenger_info, nullptr, this->dispatch);
 
     // Pick physical device and create logical device
+
+    std::cout << "Initializing Vulkan... ";
     
     const std::vector<vk::PhysicalDevice> devices = this->vulkan_instance->enumeratePhysicalDevices();
     for (const vk::PhysicalDevice& device : devices)
@@ -81,6 +120,8 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
         .setPQueuePriorities(&queue_priority);
 
     this->device = this->physical_device.createDeviceUnique(vk::DeviceCreateInfo{}
+        .setEnabledLayerCount(this->validation_layers.size())
+        .setPpEnabledLayerNames(this->validation_layers.data())
         .setQueueCreateInfoCount(1)
         .setPQueueCreateInfos(&compute_queue_info));
 
@@ -94,13 +135,8 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
             .setDescriptorType(vk::DescriptorType::eStorageBuffer)
             .setDescriptorCount(1)
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-        vk::DescriptorSetLayoutBinding{} // scene
-            .setBinding(1)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-//         vk::DescriptorSetLayoutBinding{} // textureImages
-//             .setBinding(2)
+//         vk::DescriptorSetLayoutBinding{} // camera
+//             .setBinding(1)
 //             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
 //             .setDescriptorCount(1)
 //             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
@@ -124,15 +160,16 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     // Create descriptor sets
 
     std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
-        vk::DescriptorPoolSize{}
+        vk::DescriptorPoolSize{} // outImage
             .setType(vk::DescriptorType::eStorageBuffer)
             .setDescriptorCount(1),
-        vk::DescriptorPoolSize{}
-            .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1),
+//         vk::DescriptorPoolSize{} // camera
+//             .setType(vk::DescriptorType::eUniformBuffer)
+//             .setDescriptorCount(1),
     };
 
     this->descriptor_pool = this->device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo{}
+        .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
         .setPoolSizeCount(descriptor_pool_sizes.size())
         .setPPoolSizes(descriptor_pool_sizes.data())
         .setMaxSets(1));
@@ -156,19 +193,61 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     std::vector<rgba> image{ plan.image_size.width * plan.image_size.height, rgba{ 1 } };
 
-    // Create image buffer
+    // Determine buffer and memory sizes
 
-    vk::UniqueBuffer image_buffer;
-    vk::UniqueDeviceMemory image_buffer_memory;
-    const vk::DeviceSize image_buffer_memory_size = image.size() * sizeof(rgba);
-    this->create_buffer_and_memory(image_buffer_memory_size, vk::BufferUsageFlagBits::eStorageBuffer,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-        image_buffer, image_buffer_memory);
+    const vk::DeviceSize image_buffer_memory_size = sizeof(plan.image_size) + sizeof(this->sample_count) + (image.size() * sizeof(rgba));
+//    const vk::DeviceSize camera_buffer_memory_size = sizeof(plan.cam);
+    
+    const vk::DeviceSize render_plan_memory_size = image_buffer_memory_size
+//        + camera_buffer_memory_size
+    ;
+
+    // Create buffers
+
+    vk::UniqueBuffer image_buffer = this->device->createBufferUnique(vk::BufferCreateInfo{}
+        .setSize(image_buffer_memory_size)
+        .setUsage(vk::BufferUsageFlagBits::eStorageBuffer)
+        .setSharingMode(vk::SharingMode::eExclusive));
+
+    const vk::MemoryRequirements requirements = this->device->getBufferMemoryRequirements(*image_buffer);
+    vk::UniqueDeviceMemory render_plan_memory = this->device->allocateMemoryUnique(vk::MemoryAllocateInfo{}
+        .setAllocationSize(requirements.size)
+        .setMemoryTypeIndex(find_memory_type(this->physical_device, requirements.memoryTypeBits,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)));
+
+    this->device->bindBufferMemory(*image_buffer, *render_plan_memory, 0);
+
+//     vk::UniqueBuffer camera_buffer = this->device->createBufferUnique(vk::BufferCreateInfo{}
+//         .setSize(camera_buffer_memory_size)
+//         .setUsage(vk::BufferUsageFlagBits::eStorageBuffer)
+//         .setSharingMode(vk::SharingMode::eExclusive));
+//     this->device->getBufferMemoryRequirements(*camera_buffer);
+//     this->device->bindBufferMemory(*camera_buffer, *render_plan_memory, image_buffer_memory_size);
+
+    // Copy data over
+
+    { // image
+        void* image_data = this->device->mapMemory(*render_plan_memory, 0, sizeof(plan.image_size) + sizeof(this->sample_count));
+        std::memcpy(image_data, &plan.image_size, sizeof(plan.image_size));
+        std::memcpy(static_cast<char*>(image_data) + sizeof(plan.image_size), &this->sample_count, sizeof(this->sample_count));
+        this->device->unmapMemory(*render_plan_memory);
+    }
+
+//     { // camera
+//         void* camera_data = this->device->mapMemory(*render_plan_memory, image_buffer_memory_size, camera_buffer_memory_size);
+//         std::memcpy(camera_data, &plan.cam, sizeof(plan.cam));
+//         this->device->unmapMemory(*render_plan_memory);
+//     }
+
+    // Create descriptor sets
 
     const std::vector<vk::DescriptorBufferInfo> descriptor_buffers_info = {
         vk::DescriptorBufferInfo{}
             .setBuffer(*image_buffer)
             .setRange(VK_WHOLE_SIZE),
+//         vk::DescriptorBufferInfo{}
+//             .setBuffer(*camera_buffer)
+//             .setRange(VK_WHOLE_SIZE),
     };
 
     for (size_t i = 0; i < this->descriptor_sets.size(); ++i)
@@ -176,6 +255,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
         this->device->updateDescriptorSets(vk::WriteDescriptorSet{}
             .setDstSet(*this->descriptor_sets[i])
             .setDescriptorType(vk::DescriptorType::eStorageBuffer)
+            .setDescriptorCount(1)
             .setPBufferInfo(&descriptor_buffers_info[i]), nullptr);
     }
 
@@ -210,30 +290,13 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     this->compute_queue.waitIdle();
 
-    void* image_data = this->device->mapMemory(*image_buffer_memory, 0, image_buffer_memory_size);
+    void* image_data = this->device->mapMemory(*render_plan_memory, 0, image_buffer_memory_size);
     std::memcpy(image.data(), image_data, image_buffer_memory_size);
-    this->device->unmapMemory(*image_buffer_memory);
+    this->device->unmapMemory(*render_plan_memory);
     
     std::cout << "Done." << std::endl;
 
     return image;
-}
-
-void vulkan_renderer::create_buffer_and_memory(const vk::DeviceSize size,
-    const vk::BufferUsageFlags usage, const vk::MemoryPropertyFlags properties,
-    vk::UniqueBuffer& out_buffer, vk::UniqueDeviceMemory& out_memory) const
-{
-    out_buffer = this->device->createBufferUnique(vk::BufferCreateInfo{}
-        .setSize(size)
-        .setUsage(usage)
-        .setSharingMode(vk::SharingMode::eExclusive));
-
-    const vk::MemoryRequirements requirements = this->device->getBufferMemoryRequirements(*out_buffer);
-    out_memory = this->device->allocateMemoryUnique(vk::MemoryAllocateInfo{}
-        .setAllocationSize(requirements.size)
-        .setMemoryTypeIndex(find_memory_type(this->physical_device, requirements.memoryTypeBits, properties)));
-
-    this->device->bindBufferMemory(*out_buffer, *out_memory, 0);
 }
 
 vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path)

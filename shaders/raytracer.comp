@@ -1,9 +1,23 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+// TYPE DEFINITIONS
+
 // Indices
 
 #define ArrayIndex uint
+
+// Math constants
+
+const float pi = 3.14159265358979323846264338327950288;
+const float halfPi = 1.57079632679489661923132169163975144;
+const float oneOverPi = 0.318309886183790671537767526745028724;
+const float oneOverTwoPi = 0.159154943091895335768883763372514362;
+
+// Random
+
+float randomUniform();
+float randomUniform(in const float lo, in const float hi);
 
 // Sizes
 
@@ -19,6 +33,20 @@ struct UintExtent2D
 	uint height;
 };
 
+// Pairs
+
+struct MinMax
+{
+	float lo;
+	float hi;
+};
+
+struct UV
+{
+	float u;
+	float v;
+};
+
 // Vector types
 
 #define Position vec3		// Represents arbitrary point in space.
@@ -29,11 +57,31 @@ const Direction X_AXIS = Direction(1, 0, 0);
 const Direction Y_AXIS = Direction(0, 1, 0);
 const Direction Z_AXIS = Direction(0, 0, 1);
 
+// Geometric types
+
+struct Line
+{
+	Position origin;
+	Direction direction;
+};
+
+Position pointOnLine(in const Line line, in const float t);
+
+struct Sphere
+{
+	Position origin;
+	float radius;
+};
+
+UV uvOnSphere(in const Position normalizedP);
+
 // Colors
 
 #define Color vec3		// Normalized color.
 #define ColorAlpha vec4	// Normalized color with an alpha channel.
 #define RGBA uint		// RGBA color representation with integer values between 0 and 255.
+
+RGBA toRGBA(in const Color color);
 
 // Textures
 
@@ -73,6 +121,12 @@ struct NoiseTexture
 	float scale;
 	Color baseColor;
 };
+
+Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position);
+Color colorAtTexture(in const ConstantTexture tex, in const UV uv, in const Position position);
+Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Position position);
+Color colorAtTexture(in const ImageTexture tex, in const UV uv, in const Position position);
+Color colorAtTexture(in const NoiseTexture tex, in const UV uv, in const Position position);
 
 // Materials
 
@@ -125,14 +179,49 @@ struct Shape
 
 struct SphereShape
 {
-	vec3 origin;
-	float radius;
+	Sphere shapeData;
 	Material material;
 };
 
-// Camera
+// Ray
 
-struct Camera
+struct Ray
+{
+	Line line;
+};
+
+Ray shootRayAt(in const UV);
+Color seenColor(in const Ray ray);
+
+// Hit detection
+
+struct Hit
+{
+	float t;
+	Position point;
+	Displacement normal;
+	Material material;
+	UV uv;
+};
+
+struct HitRecord
+{
+	bool occurred;
+	Hit record;
+};
+
+HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t);
+
+// I/O
+
+layout(set = 0, binding = 0) buffer Image
+{
+	UintExtent2D size;
+	uint sampleCount;
+	RGBA pixels[];
+} outImage;
+
+layout(set = 0, binding = 1) readonly uniform Camera
 {
 	Position origin;
 	Position lowerLeftCorner;
@@ -142,17 +231,11 @@ struct Camera
 	Displacement u;
 	Displacement v;
 	float lensRadius;
-};
+	MinMax time;
+} camera;
 
-// I/O
-
-layout(set = 0, binding = 0) buffer Image
-{
-	RGBA pixels[];
-} outImage;
-
-layout(set = 0, binding = 1) readonly uniform Scene
-{
+layout(set = 0, binding = 2) readonly uniform Scene
+{ 
 	Shape shapes[];
 	SphereShape sphereShapes[];
 
@@ -170,20 +253,152 @@ layout(set = 0, binding = 1) readonly uniform Scene
 	Camera camera;
 } scene;
 
-layout(set = 0, binding = 2) uniform sampler2D textureImages[];
+layout(set = 0, binding = 3) uniform sampler2D textureImages[];
 
-// Ray Tracer
+const float inverseImageWidth = 1.f / outImage.size.width;
+const float inverseImageHeight = 1.f / outImage.size.height;
+
+// IMPLEMENTATIONS
 
 void main()
 {
-	const vec3 color = vec3(
+	vec3 color;
+	for (uint i = 0; i < outImage.sampleCount; ++i)
+	{
+		const UV uv = {
+			gl_GlobalInvocationID.x * inverseImageWidth,
+			(outImage.size.height - gl_GlobalInvocationID.y) * inverseImageHeight
+		};
+		const Ray ray = shootRayAt(uv);
+		color += seenColor(ray);
+	}
+	color /= float(outImage.sampleCount);
+
+	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * outImage.size.width;
+	outImage.pixels[pixelIndex] = toRGBA(color);
+}
+
+// Ray
+
+Ray shootRayAt(in const UV)
+{
+	return Ray(Line(Position(0), Displacement(0)));
+}
+
+Color seenColor(in const Ray ray)
+{
+	//return scene.sky
+	return vec3(
 		0.5 * (1 + sin(radians(gl_GlobalInvocationID.x))),
 		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y))),
-		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y)) * sin(radians(gl_GlobalInvocationID.x))));
+		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y)) * sin(radians(gl_GlobalInvocationID.x))));;
+}
 
-	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 1600;
-	outImage.pixels[pixelIndex] =
+// Shapes
+
+HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t)
+{
+	const Sphere shapeData = sphere.shapeData;
+	const Displacement oc = ray.line.origin - shapeData.origin;
+	const float a = dot(ray.line.direction, ray.line.direction);
+	const float b = dot(oc, ray.line.direction);
+	const float c = dot(oc, oc) * pow(shapeData.radius, 2);
+	const float discriminant = b * b - a * c;
+
+	if (discriminant > 0)
+	{
+		float root = (-b - sqrt(discriminant)) / a;
+		if (root > t.hi || root < t.lo)
+		{
+			root = (-b + sqrt(discriminant)) / a;
+		}
+		if (root < t.hi && root > t.lo)
+		{
+			const Position point = pointOnLine(ray.line, root);
+			const UV uv = uvOnSphere(abs(1 / shapeData.radius) * (point - shapeData.origin));
+			const Direction normal = (point - shapeData.origin) / shapeData.radius;
+			return HitRecord(true, Hit(root, point, normal, sphere.material, uv));
+		}
+	}
+	return HitRecord(false, Hit(0, Position(0), Displacement(0), Material(0, 0), UV(0, 0)));
+}
+
+// Textures
+
+Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position)
+{
+	switch (tex.type)
+	{
+	case TEXTURE_TYPE_CHECKER:
+		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_CONSTANT:
+		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_IMAGE:
+		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_NOISE:
+		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
+	}
+	return Color(1.f);
+}
+
+Color colorAtTexture(in const ConstantTexture tex, in const UV uv, in const Position position)
+{
+	return tex.value;
+}
+
+Color colorAtTexture(in const ImageTexture tex, in const UV uv, in const Position position)
+{
+	return Color(1.f);
+}
+
+Color colorAtTexture(in const NoiseTexture tex, in const UV uv, in const Position position)
+{
+	return Color(1.f);
+}
+
+Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Position position)
+{
+	if (sin(tex.scale * position.x) * sin(tex.scale * position.y) * sin(tex.scale * position.z) < 0)
+	{
+		return colorAtTexture(tex.odd, uv, position);
+	}
+	return colorAtTexture(tex.even, uv, position);
+}
+
+// Colors
+
+RGBA toRGBA(in const Color color)
+{
+	return
 		(uint(color.r * 255) <<  0) |
 		(uint(color.g * 255) <<  8) |
 		(uint(color.b * 255) << 16) | 0xff000000;
+}
+
+// Geometric
+
+Position pointOnLine(in const Line line, in const float t)
+{
+	return line.origin + (t * line.direction);
+}
+
+UV uvOnSphere(in const Position normalizedP)
+{
+	return UV(
+        1 - (atan(normalizedP.z, normalizedP.x) + pi) * oneOverTwoPi,
+        (asin(normalizedP.y) + halfPi) * oneOverPi);
+}
+
+// Random
+
+float seed = 0;
+
+float randomUniform()
+{
+	return fract(sin(seed += 0.01) * 100000.0);
+}
+
+float randomUniform(in const float lo, in const float hi)
+{
+	return lo + (randomUniform() * (hi - lo));
 }

@@ -17,5 +17,9 @@ if(UNIX)
 elseif(WIN32)
 	find_package(glm CONFIG REQUIRED)
 	find_package(Vulkan REQUIRED)
-	target_link_libraries(One-Weekend-Raytracer PRIVATE glm Vulkan::Vulkan)
+	find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
+	target_link_libraries(One-Weekend-Raytracer PRIVATE
+		glm
+		Vulkan::Vulkan
+		unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
 endif()

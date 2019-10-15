@@ -46,11 +46,11 @@ int main()
         const extent_2d<uint32_t> image_size = { 1600, 900 };
         const render_plan plan = render_plan::random_balls(image_size);
 
-//         const std::vector<rgba> image = vulkan_renderer{ 1000 }.render_scene(plan);
-//         export_image(image, image_size, "test.png");
+        const std::vector<rgba> image = vulkan_renderer{ 1000 }.render_scene(plan);
+        export_image(image, image_size, "test.png");
 
-        const std::vector<rgba> image = cpu_renderer{ 1000, 20 }.render_scene(plan);
-        export_image(image, image_size, "image.png");
+//         const std::vector<rgba> image = cpu_renderer{ 1000, 20 }.render_scene(plan);
+//         export_image(image, image_size, "image.png");
     }
     catch (const std::exception& e)
     {
