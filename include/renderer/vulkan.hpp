@@ -1,6 +1,8 @@
 #pragma once
 
+#include <camera.hpp>
 #include <util/colors.hpp>
+#include <util/sizes.hpp>
 #include <util/vk_mem_alloc.hpp>
 
 #include <vulkan/vulkan.hpp>
@@ -9,6 +11,13 @@
 
 class vulkan_renderer
 {
+    struct render_info
+    {
+        extent_2d<uint32_t> image_extent;
+        uint32_t sample_count;
+        camera cam;
+    };
+
 public:
     vulkan_renderer(const uint32_t sample_count);
     ~vulkan_renderer();

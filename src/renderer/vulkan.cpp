@@ -75,13 +75,13 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     using MsgSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT;
     using MsgType = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
+    const auto application_info = vk::ApplicationInfo{}
+        .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
     const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
         .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
         .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
         .setPfnUserCallback(debug_callback);
 
-    const auto application_info = vk::ApplicationInfo{}
-        .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
     this->vulkan_instance = vk::createInstanceUnique(vk::InstanceCreateInfo{}
         .setPApplicationInfo(&application_info)
         .setPNext(&debug_messenger_info)
@@ -90,7 +90,6 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
         .setEnabledExtensionCount(this->extensions.size())
         .setPpEnabledExtensionNames(this->extensions.data()));
     this->dispatch.init(*this->vulkan_instance);
-
     this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
         debug_messenger_info, nullptr, this->dispatch);
 
@@ -139,28 +138,18 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     std::cout << "Setting up ";
 
     const std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-         vk::DescriptorSetLayoutBinding{} // renderInfo
-             .setBinding(0)
-             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-             .setDescriptorCount(1)
-             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-         vk::DescriptorSetLayoutBinding{} // camera
-             .setBinding(1)
-             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-             .setDescriptorCount(1)
-             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
          vk::DescriptorSetLayoutBinding{} // scene
-             .setBinding(2)
-             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-             .setDescriptorCount(1)
-             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+            .setBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
          vk::DescriptorSetLayoutBinding{} // textureImages
-             .setBinding(3)
-             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-             .setDescriptorCount(1)
-             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+            .setBinding(1)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
         vk::DescriptorSetLayoutBinding{} // outImage
-            .setBinding(4)
+            .setBinding(2)
             .setDescriptorType(vk::DescriptorType::eStorageBuffer)
             .setDescriptorCount(1)
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
@@ -174,9 +163,18 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
 
     std::cout << "pipeline layout... ";
 
+    const std::vector<vk::PushConstantRange> push_constant_ranges = {
+        vk::PushConstantRange{}
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute)
+            .setOffset(0)
+            .setSize(sizeof(render_info)),
+    };
+
     this->pipeline_layout = this->device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo{}
         .setSetLayoutCount(1)
-        .setPSetLayouts(&this->set_layout.get()));
+        .setPSetLayouts(&this->set_layout.get())
+        .setPushConstantRangeCount(push_constant_ranges.size())
+        .setPPushConstantRanges(push_constant_ranges.data()));
 
     std::cout << "compute pipeline... ";
 
@@ -193,19 +191,10 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
 
     std::cout << "Creating descriptor pool... ";
 
-    std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
-        vk::DescriptorPoolSize{} // renderInfo
+    const std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
+        vk::DescriptorPoolSize{} // scene, textureImages
             .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1),
-        vk::DescriptorPoolSize{} // camera
-            .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1),
-        vk::DescriptorPoolSize{} // scene
-            .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1),
-        vk::DescriptorPoolSize{} // textureImages
-            .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1),
+            .setDescriptorCount(2),
         vk::DescriptorPoolSize{} // outImage
             .setType(vk::DescriptorType::eStorageBuffer)
             .setDescriptorCount(1),
@@ -244,41 +233,15 @@ vulkan_renderer::~vulkan_renderer()
 
 std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 {
-    std::cout << "Creating buffers for ";
-
     std::vector<rgba> image{ plan.image_size.width * plan.image_size.height, rgba{ 1 } };
 
     // Create buffers
 
-    const vk::DeviceSize render_info_buffer_size = sizeof(plan.image_size) + sizeof(this->sample_count);
-    const vk::DeviceSize camera_buffer_size = sizeof(plan.cam);
+    std::cout << "Creating buffers for ";
+
     const vk::DeviceSize scene_buffer_size = 1;
     const vk::DeviceSize texture_images_buffer_size = 1;
     const vk::DeviceSize image_buffer_size = image.size() * sizeof(rgba);
-
-    std::cout << "render info... ";
-
-    auto [render_info_buffer, render_info_allocation] = this->memory_allocator.createBuffer(
-        vk::BufferCreateInfo{}
-            .setSize(render_info_buffer_size)
-            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-            .setSharingMode(vk::SharingMode::eExclusive),
-        vma::AllocationCreateInfo{}
-            .setUsage(vma::MemoryUsage::eGpuOnly)
-            .setRequiredFlags(vk::MemoryPropertyFlagBits::eHostVisible)
-            .setPreferredFlags(vk::MemoryPropertyFlagBits::eHostCoherent));
-
-    std::cout << "camera... ";
-
-    auto [camera_buffer, camera_allocation] = this->memory_allocator.createBuffer(
-        vk::BufferCreateInfo{}
-            .setSize(camera_buffer_size)
-            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-            .setSharingMode(vk::SharingMode::eExclusive),
-        vma::AllocationCreateInfo{}
-            .setUsage(vma::MemoryUsage::eGpuOnly)
-            .setRequiredFlags(vk::MemoryPropertyFlagBits::eHostVisible)
-            .setPreferredFlags(vk::MemoryPropertyFlagBits::eHostCoherent));
 
     std::cout << "scene... ";
 
@@ -317,51 +280,41 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setPreferredFlags(vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostCoherent)
             .setFlags(vma::AllocationCreateFlagBits::eMapped));
 
-    // Copy data over
-
-    { // render info
-        void* data = this->memory_allocator.mapMemory(render_info_allocation);
-        std::memcpy(data, &plan.image_size, sizeof(plan.image_size));
-        std::memcpy(static_cast<char*>(data) + sizeof(plan.image_size), &this->sample_count, sizeof(this->sample_count));
-        this->memory_allocator.unmapMemory(render_info_allocation);
-    }
-
-    { // camera
-        void* data = this->memory_allocator.mapMemory(camera_allocation);
-        std::memcpy(data, &plan.cam, sizeof(plan.cam));
-        this->memory_allocator.unmapMemory(camera_allocation);
-    }
-
     // Create descriptor sets
 
-    const std::vector<vk::DescriptorBufferInfo> descriptor_buffers_info = {
-        vk::DescriptorBufferInfo{}
-            .setBuffer(render_info_buffer)
-            .setRange(VK_WHOLE_SIZE),
-        vk::DescriptorBufferInfo{}
-            .setBuffer(camera_buffer)
-            .setRange(VK_WHOLE_SIZE),
-        vk::DescriptorBufferInfo{}
-            .setBuffer(scene_buffer)
-            .setRange(VK_WHOLE_SIZE),
-        vk::DescriptorBufferInfo{}
-            .setBuffer(texture_images_buffer)
-            .setRange(VK_WHOLE_SIZE),
-        vk::DescriptorBufferInfo{}
-            .setBuffer(image_buffer)
-            .setRange(VK_WHOLE_SIZE),
+    struct descriptor_set_update_info
+    {
+        std::vector<vk::DescriptorBufferInfo> descriptor_buffer_infos;
+        vk::DescriptorType descriptor_type;
+    };
+    const std::vector<descriptor_set_update_info> descriptor_set_update_infos = {
+        descriptor_set_update_info{
+            {
+                vk::DescriptorBufferInfo{}
+                    .setBuffer(scene_buffer)
+                    .setRange(VK_WHOLE_SIZE),
+                vk::DescriptorBufferInfo{}
+                    .setBuffer(texture_images_buffer)
+                    .setRange(VK_WHOLE_SIZE),
+            }, vk::DescriptorType::eUniformBuffer
+        },
+        descriptor_set_update_info{
+            {
+                vk::DescriptorBufferInfo{}
+                    .setBuffer(image_buffer)
+                    .setRange(VK_WHOLE_SIZE),
+            }, vk::DescriptorType::eStorageBuffer
+        }
     };
 
     for (size_t i = 0; i < this->descriptor_sets.size(); ++i)
     {
-        const vk::DescriptorType type = i == this->descriptor_sets.size() - 1
-            ? vk::DescriptorType::eStorageBuffer
-            : vk::DescriptorType::eUniformBuffer;
+        const descriptor_set_update_info& dsui = descriptor_set_update_infos[i];
         this->device->updateDescriptorSets(vk::WriteDescriptorSet{}
             .setDstSet(*this->descriptor_sets[i])
-            .setDescriptorType(type)
-            .setDescriptorCount(1)
-            .setPBufferInfo(&descriptor_buffers_info[i]), nullptr);
+            .setDescriptorType(dsui.descriptor_type)
+            .setDescriptorCount(dsui.descriptor_buffer_infos.size())
+            .setPBufferInfo(dsui.descriptor_buffer_infos.data()), nullptr);
     }
 
     std::cout << "Done." << std::endl;
@@ -376,15 +329,21 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setLevel(vk::CommandBufferLevel::ePrimary)
             .setCommandBufferCount(1));
 
+    const render_info info = { plan.image_size, this->sample_count, plan.cam };
     for (size_t i = 0; i < command_buffers.size(); ++i)
     {
         vk::UniqueCommandBuffer& command_buffer = command_buffers[i];
 
         command_buffer->begin(vk::CommandBufferBeginInfo{});
         command_buffer->bindPipeline(vk::PipelineBindPoint::eCompute, *this->compute_pipeline);
+
         command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eCompute, *this->pipeline_layout, 0,
             1, &*this->descriptor_sets[i],
             0, {});
+        
+        command_buffer->pushConstants(*this->pipeline_layout, vk::ShaderStageFlagBits::eCompute,
+            0, sizeof(render_info), &info);
+        
         command_buffer->dispatch(plan.image_size.width, plan.image_size.height, 1);
         command_buffer->end();
 
@@ -404,8 +363,6 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Done." << std::endl;
 
     // Cleanup
-    this->memory_allocator.destroyBuffer(render_info_buffer, render_info_allocation);
-    this->memory_allocator.destroyBuffer(camera_buffer, camera_allocation);
     this->memory_allocator.destroyBuffer(scene_buffer, scene_allocation);
     this->memory_allocator.destroyBuffer(texture_images_buffer, texture_images_allocation);
     this->memory_allocator.destroyBuffer(image_buffer, image_allocation);

@@ -190,8 +190,24 @@ struct Ray
 	Line line;
 };
 
-Ray shootRayAt(in const UV);
 Color seenColor(in const Ray ray);
+
+// Camera
+
+struct Camera
+{
+	Position origin;
+	Position lowerLeftCorner;
+	Position horizontal;
+	Position vertical;
+	Displacement w;
+	Displacement u;
+	Displacement v;
+	float lensRadius;
+	MinMax time;
+};
+
+Ray shootRayAt(in const UV);
 
 // Hit detection
 
@@ -214,26 +230,14 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 
 // I/O
 
-layout(set = 0, binding = 0) uniform RenderInfo
+layout(push_constant) uniform RenderInfo
 {
 	UintExtent2D imageExtent;
 	uint sampleCount;
+	Camera camera;
 } renderInfo;
 
-layout(set = 0, binding = 1) uniform Camera
-{
-	Position origin;
-	Position lowerLeftCorner;
-	Position horizontal;
-	Position vertical;
-	Displacement w;
-	Displacement u;
-	Displacement v;
-	float lensRadius;
-	MinMax time;
-} camera;
-
-layout(set = 0, binding = 2) readonly uniform Scene
+layout(set = 0, binding = 0) readonly uniform Scene
 { 
 	Shape shapes[];
 	SphereShape sphereShapes[];
@@ -251,12 +255,12 @@ layout(set = 0, binding = 2) readonly uniform Scene
 	Texture sky;
 } scene;
 
-layout(set = 0, binding = 3) readonly uniform TextureImages
+layout(set = 0, binding = 1) readonly uniform TextureImages
 {
 	RGBA pixels[];
 } textureImages[];
 
-layout(set = 0, binding = 4) buffer Image
+layout(set = 0, binding = 2) buffer Image
 {
 	RGBA pixels[];
 } outImage;
