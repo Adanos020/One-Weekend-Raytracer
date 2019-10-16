@@ -133,39 +133,39 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     // Create descriptor sets
 
-    struct descriptor_set_update_info
-    {
-        std::vector<vk::DescriptorBufferInfo> descriptor_buffer_infos;
-        vk::DescriptorType descriptor_type;
-    };
-    const std::vector<descriptor_set_update_info> descriptor_set_update_infos = {
-        descriptor_set_update_info{
-            {
-                vk::DescriptorBufferInfo{}
-                    .setBuffer(scene_buffer)
-                    .setRange(VK_WHOLE_SIZE),
-                vk::DescriptorBufferInfo{}
-                    .setBuffer(texture_images_buffer)
-                    .setRange(VK_WHOLE_SIZE),
-            }, vk::DescriptorType::eUniformBuffer
-        },
-        descriptor_set_update_info{
-            {
-                vk::DescriptorBufferInfo{}
-                    .setBuffer(image_buffer)
-                    .setRange(VK_WHOLE_SIZE),
-            }, vk::DescriptorType::eStorageBuffer
-        }
-    };
+    const auto scene_descriptor_info = vk::DescriptorBufferInfo{}
+        .setBuffer(scene_buffer)
+        .setRange(VK_WHOLE_SIZE);
+    const auto texture_images_descriptor_info = vk::DescriptorBufferInfo{}
+        .setBuffer(texture_images_buffer)
+        .setRange(VK_WHOLE_SIZE);
+    const auto image_descriptor_info = vk::DescriptorBufferInfo{}
+        .setBuffer(image_buffer)
+        .setRange(VK_WHOLE_SIZE);
 
     for (size_t i = 0; i < this->descriptor_sets.size(); ++i)
     {
-        const descriptor_set_update_info& dsui = descriptor_set_update_infos[i];
-        this->device->updateDescriptorSets(vk::WriteDescriptorSet{}
-            .setDstSet(*this->descriptor_sets[i])
-            .setDescriptorType(dsui.descriptor_type)
-            .setDescriptorCount(dsui.descriptor_buffer_infos.size())
-            .setPBufferInfo(dsui.descriptor_buffer_infos.data()), nullptr);
+        const std::vector<vk::WriteDescriptorSet> descriptor_writes = {
+            vk::WriteDescriptorSet{}
+                .setDstBinding(0)
+                .setDstSet(*this->descriptor_sets[i])
+                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                .setDescriptorCount(1)
+                .setPBufferInfo(&scene_descriptor_info),
+            vk::WriteDescriptorSet{}
+                .setDstBinding(1)
+                .setDstSet(*this->descriptor_sets[i])
+                .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+                .setDescriptorCount(1)
+                .setPBufferInfo(&texture_images_descriptor_info),
+            vk::WriteDescriptorSet{}
+                .setDstBinding(2)
+                .setDstSet(*this->descriptor_sets[i])
+                .setDescriptorType(vk::DescriptorType::eStorageBuffer)
+                .setDescriptorCount(1)
+                .setPBufferInfo(&image_descriptor_info),
+        };
+        this->device->updateDescriptorSets(descriptor_writes, nullptr);
     }
 
     std::cout << "Done." << std::endl;
