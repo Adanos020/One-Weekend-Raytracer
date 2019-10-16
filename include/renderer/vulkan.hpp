@@ -25,6 +25,13 @@ public:
     std::vector<rgba> render_scene(const struct render_plan&);
 
 private:
+    void create_instance();
+    void setup_devices();
+    void setup_pipeline();
+    void create_descriptor_sets();
+    void create_command_pool();
+
+private:
     vk::UniqueShaderModule load_shader_module(const std::string_view code_path);
 
 private:

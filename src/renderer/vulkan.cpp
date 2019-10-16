@@ -70,160 +70,11 @@ uint32_t find_memory_type(const vk::PhysicalDevice& physical_device, const uint3
 vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
     : sample_count(sample_count)
 {
-    // Create instance and debug messenger
-
-    using MsgSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT;
-    using MsgType = vk::DebugUtilsMessageTypeFlagBitsEXT;
-
-    const auto application_info = vk::ApplicationInfo{}
-        .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
-    const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
-        .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
-        .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
-        .setPfnUserCallback(debug_callback);
-
-    this->vulkan_instance = vk::createInstanceUnique(vk::InstanceCreateInfo{}
-        .setPApplicationInfo(&application_info)
-        .setPNext(&debug_messenger_info)
-        .setPpEnabledLayerNames(this->validation_layers.data())
-        .setEnabledLayerCount(this->validation_layers.size())
-        .setEnabledExtensionCount(this->extensions.size())
-        .setPpEnabledExtensionNames(this->extensions.data()));
-    this->dispatch.init(*this->vulkan_instance);
-    this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
-        debug_messenger_info, nullptr, this->dispatch);
-
-    // Pick physical device and create logical device
-
-    std::cout << "Picking physical device... ";
-    
-    const std::vector<vk::PhysicalDevice> devices = this->vulkan_instance->enumeratePhysicalDevices();
-    for (const vk::PhysicalDevice& device : devices)
-    {
-        if (std::optional<uint32_t> compute_queue = find_compute_queue_family(device))
-        {
-            this->physical_device = device;
-            this->compute_queue_index = *compute_queue;
-            break;
-        }
-    }
-
-    if (!this->physical_device)
-    {
-        throw std::runtime_error("Failed to find a suitable device.");
-    }
-
-    const float queue_priority = 1.f;
-    const auto compute_queue_info = vk::DeviceQueueCreateInfo{}
-        .setQueueFamilyIndex(this->compute_queue_index)
-        .setQueueCount(1)
-        .setPQueuePriorities(&queue_priority);
-
-    this->device = this->physical_device.createDeviceUnique(vk::DeviceCreateInfo{}
-        .setEnabledLayerCount(this->validation_layers.size())
-        .setPpEnabledLayerNames(this->validation_layers.data())
-        .setQueueCreateInfoCount(1)
-        .setPQueueCreateInfos(&compute_queue_info));
-
-    this->compute_queue = this->device->getQueue(this->compute_queue_index, 0);
-
-    this->memory_allocator = vma::createAllocator(vma::AllocatorCreateInfo{}
-        .setPhysicalDevice(this->physical_device)
-        .setDevice(*this->device));
-
-    std::cout << "Done." << std::endl;
-
-    // Setup pipeline
-
-    std::cout << "Setting up ";
-
-    const std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-         vk::DescriptorSetLayoutBinding{} // scene
-            .setBinding(0)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-         vk::DescriptorSetLayoutBinding{} // textureImages
-            .setBinding(1)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-        vk::DescriptorSetLayoutBinding{} // outImage
-            .setBinding(2)
-            .setDescriptorType(vk::DescriptorType::eStorageBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
-    };
-
-    std::cout << "set layout... ";
-
-    this->set_layout = this->device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo{}
-        .setBindingCount(bindings.size())
-        .setPBindings(bindings.data()));
-
-    std::cout << "pipeline layout... ";
-
-    const std::vector<vk::PushConstantRange> push_constant_ranges = {
-        vk::PushConstantRange{}
-            .setStageFlags(vk::ShaderStageFlagBits::eCompute)
-            .setOffset(0)
-            .setSize(sizeof(render_info)),
-    };
-
-    this->pipeline_layout = this->device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo{}
-        .setSetLayoutCount(1)
-        .setPSetLayouts(&this->set_layout.get())
-        .setPushConstantRangeCount(push_constant_ranges.size())
-        .setPPushConstantRanges(push_constant_ranges.data()));
-
-    std::cout << "compute pipeline... ";
-
-    this->compute_pipeline = this->device->createComputePipelineUnique(nullptr, vk::ComputePipelineCreateInfo{}
-        .setStage(vk::PipelineShaderStageCreateInfo{}
-            .setStage(vk::ShaderStageFlagBits::eCompute)
-            .setModule(*this->load_shader_module("shaders/raytracer.comp.spv"))
-            .setPName("main"))
-        .setLayout(*this->pipeline_layout));
-
-    std::cout << "Done." << std::endl;
-
-    // Create descriptor sets
-
-    std::cout << "Creating descriptor pool... ";
-
-    const std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
-        vk::DescriptorPoolSize{} // scene, textureImages
-            .setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(2),
-        vk::DescriptorPoolSize{} // outImage
-            .setType(vk::DescriptorType::eStorageBuffer)
-            .setDescriptorCount(1),
-    };
-
-    this->descriptor_pool = this->device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo{}
-        .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-        .setPoolSizeCount(descriptor_pool_sizes.size())
-        .setPPoolSizes(descriptor_pool_sizes.data())
-        .setMaxSets(1));
-
-    std::cout << "Done." << std::endl;
-    std::cout << "Creating descriptor sets... ";
-
-    this->descriptor_sets = this->device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo{}
-        .setDescriptorPool(*this->descriptor_pool)
-        .setDescriptorSetCount(1)
-        .setPSetLayouts(&*this->set_layout));
-
-    std::cout << "Done." << std::endl;
-
-    // Create command pool
-
-    std::cout << "Creating command pool... ";
-
-    this->command_pool = this->device->createCommandPoolUnique(vk::CommandPoolCreateInfo{}
-        .setQueueFamilyIndex(this->compute_queue_index));
-
-    std::cout << "Done." << std::endl;
+    this->create_instance();
+    this->setup_devices();
+    this->setup_pipeline();
+    this->create_descriptor_sets();
+    this->create_command_pool();
 }
 
 vulkan_renderer::~vulkan_renderer()
@@ -368,6 +219,166 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     this->memory_allocator.destroyBuffer(image_buffer, image_allocation);
 
     return image;
+}
+
+void vulkan_renderer::create_instance()
+{
+    using MsgSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT;
+    using MsgType = vk::DebugUtilsMessageTypeFlagBitsEXT;
+
+    const auto application_info = vk::ApplicationInfo{}
+    .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
+    const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
+        .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
+        .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
+        .setPfnUserCallback(debug_callback);
+
+    this->vulkan_instance = vk::createInstanceUnique(vk::InstanceCreateInfo{}
+        .setPApplicationInfo(&application_info)
+        .setPNext(&debug_messenger_info)
+        .setPpEnabledLayerNames(this->validation_layers.data())
+        .setEnabledLayerCount(this->validation_layers.size())
+        .setEnabledExtensionCount(this->extensions.size())
+        .setPpEnabledExtensionNames(this->extensions.data()));
+    this->dispatch.init(*this->vulkan_instance);
+    this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
+        debug_messenger_info, nullptr, this->dispatch);
+}
+
+void vulkan_renderer::setup_devices()
+{
+    std::cout << "Picking physical device... ";
+
+    const std::vector<vk::PhysicalDevice> devices = this->vulkan_instance->enumeratePhysicalDevices();
+    for (const vk::PhysicalDevice& device : devices)
+    {
+        if (std::optional<uint32_t> compute_queue = find_compute_queue_family(device))
+        {
+            this->physical_device = device;
+            this->compute_queue_index = *compute_queue;
+            break;
+        }
+    }
+
+    if (!this->physical_device)
+    {
+        throw std::runtime_error("Failed to find a suitable device.");
+    }
+
+    const float queue_priority = 1.f;
+    const auto compute_queue_info = vk::DeviceQueueCreateInfo{}
+        .setQueueFamilyIndex(this->compute_queue_index)
+        .setQueueCount(1)
+        .setPQueuePriorities(&queue_priority);
+
+    this->device = this->physical_device.createDeviceUnique(vk::DeviceCreateInfo{}
+        .setEnabledLayerCount(this->validation_layers.size())
+        .setPpEnabledLayerNames(this->validation_layers.data())
+        .setQueueCreateInfoCount(1)
+        .setPQueueCreateInfos(&compute_queue_info));
+
+    this->compute_queue = this->device->getQueue(this->compute_queue_index, 0);
+
+    this->memory_allocator = vma::createAllocator(vma::AllocatorCreateInfo{}
+        .setPhysicalDevice(this->physical_device)
+        .setDevice(*this->device));
+
+    std::cout << "Done." << std::endl;
+}
+
+void vulkan_renderer::setup_pipeline()
+{
+    std::cout << "Setting up ";
+
+    const std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+         vk::DescriptorSetLayoutBinding{} // scene
+            .setBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+         vk::DescriptorSetLayoutBinding{} // textureImages
+            .setBinding(1)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+        vk::DescriptorSetLayoutBinding{} // outImage
+            .setBinding(2)
+            .setDescriptorType(vk::DescriptorType::eStorageBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute),
+    };
+
+    std::cout << "set layout... ";
+
+    this->set_layout = this->device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo{}
+        .setBindingCount(bindings.size())
+        .setPBindings(bindings.data()));
+
+    std::cout << "pipeline layout... ";
+
+    const std::vector<vk::PushConstantRange> push_constant_ranges = {
+        vk::PushConstantRange{}
+            .setStageFlags(vk::ShaderStageFlagBits::eCompute)
+            .setOffset(0)
+            .setSize(sizeof(render_info)),
+    };
+
+    this->pipeline_layout = this->device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo{}
+        .setSetLayoutCount(1)
+        .setPSetLayouts(&this->set_layout.get())
+        .setPushConstantRangeCount(push_constant_ranges.size())
+        .setPPushConstantRanges(push_constant_ranges.data()));
+
+    std::cout << "compute pipeline... ";
+
+    this->compute_pipeline = this->device->createComputePipelineUnique(nullptr, vk::ComputePipelineCreateInfo{}
+        .setStage(vk::PipelineShaderStageCreateInfo{}
+            .setStage(vk::ShaderStageFlagBits::eCompute)
+            .setModule(*this->load_shader_module("shaders/raytracer.comp.spv"))
+            .setPName("main"))
+        .setLayout(*this->pipeline_layout));
+
+    std::cout << "Done." << std::endl;
+}
+
+void vulkan_renderer::create_descriptor_sets()
+{
+    std::cout << "Creating descriptor pool... ";
+
+    const std::vector<vk::DescriptorPoolSize> descriptor_pool_sizes = {
+        vk::DescriptorPoolSize{} // scene, textureImages
+            .setType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(2),
+        vk::DescriptorPoolSize{} // outImage
+            .setType(vk::DescriptorType::eStorageBuffer)
+            .setDescriptorCount(1),
+    };
+
+    this->descriptor_pool = this->device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo{}
+        .setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+        .setPoolSizeCount(descriptor_pool_sizes.size())
+        .setPPoolSizes(descriptor_pool_sizes.data())
+        .setMaxSets(1));
+
+    std::cout << "Done." << std::endl;
+    std::cout << "Creating descriptor sets... ";
+
+    this->descriptor_sets = this->device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo{}
+        .setDescriptorPool(*this->descriptor_pool)
+        .setDescriptorSetCount(1)
+        .setPSetLayouts(&*this->set_layout));
+
+    std::cout << "Done." << std::endl;
+}
+
+void vulkan_renderer::create_command_pool()
+{
+    std::cout << "Creating command pool... ";
+
+    this->command_pool = this->device->createCommandPoolUnique(vk::CommandPoolCreateInfo{}
+        .setQueueFamilyIndex(this->compute_queue_index));
+
+    std::cout << "Done." << std::endl;
 }
 
 vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path)
