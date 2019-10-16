@@ -1,3 +1,5 @@
+#define VMA_IMPLEMENTATION
+
 #include <render_plan.hpp>
 #include <renderer/cpu.hpp>
 #include <renderer/vulkan.hpp>

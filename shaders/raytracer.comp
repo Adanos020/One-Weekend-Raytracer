@@ -214,14 +214,13 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 
 // I/O
 
-layout(set = 0, binding = 0) buffer Image
+layout(set = 0, binding = 0) uniform RenderInfo
 {
-	UintExtent2D size;
+	UintExtent2D imageExtent;
 	uint sampleCount;
-	RGBA pixels[];
-} outImage;
+} renderInfo;
 
-layout(set = 0, binding = 1) readonly uniform Camera
+layout(set = 0, binding = 1) uniform Camera
 {
 	Position origin;
 	Position lowerLeftCorner;
@@ -250,31 +249,38 @@ layout(set = 0, binding = 2) readonly uniform Scene
 	NoiseTexture noiseTextures[];
 
 	Texture sky;
-	Camera camera;
 } scene;
 
-layout(set = 0, binding = 3) uniform sampler2D textureImages[];
+layout(set = 0, binding = 3) readonly uniform TextureImages
+{
+	RGBA pixels[];
+} textureImages[];
 
-const float inverseImageWidth = 1.f / outImage.size.width;
-const float inverseImageHeight = 1.f / outImage.size.height;
+layout(set = 0, binding = 4) buffer Image
+{
+	RGBA pixels[];
+} outImage;
 
 // IMPLEMENTATIONS
 
 void main()
 {
+	const float inverseImageWidth = 1.f / float(renderInfo.imageExtent.width);
+	const float inverseImageHeight = 1.f / float(renderInfo.imageExtent.height);
+
 	vec3 color;
-	for (uint i = 0; i < outImage.sampleCount; ++i)
+	for (uint i = 0; i < renderInfo.sampleCount; ++i)
 	{
 		const UV uv = {
 			gl_GlobalInvocationID.x * inverseImageWidth,
-			(outImage.size.height - gl_GlobalInvocationID.y) * inverseImageHeight
+			(renderInfo.imageExtent.height - gl_GlobalInvocationID.y) * inverseImageHeight
 		};
 		const Ray ray = shootRayAt(uv);
 		color += seenColor(ray);
 	}
-	color /= float(outImage.sampleCount);
+	color /= float(renderInfo.sampleCount);
 
-	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * outImage.size.width;
+	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * renderInfo.imageExtent.width;
 	outImage.pixels[pixelIndex] = toRGBA(color);
 }
 
@@ -327,17 +333,17 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 
 Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position)
 {
-	switch (tex.type)
-	{
-	case TEXTURE_TYPE_CHECKER:
-		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_CONSTANT:
-		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_IMAGE:
-		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_NOISE:
-		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
-	}
+//	switch (tex.type)
+//	{
+//	case TEXTURE_TYPE_CHECKER:
+//		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_CONSTANT:
+//		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_IMAGE:
+//		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_NOISE:
+//		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
+//	}
 	return Color(1.f);
 }
 
