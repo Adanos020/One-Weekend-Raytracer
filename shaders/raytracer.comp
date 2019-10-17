@@ -79,9 +79,9 @@ UV uvOnSphere(in const Position normalizedP);
 
 #define Color vec3		// Normalized color.
 #define ColorAlpha vec4	// Normalized color with an alpha channel.
-#define RGBA uint		// RGBA color representation with integer values between 0 and 255.
+#define RGBA uvec4		// RGBA color representation with integer values between 0 and 255.
 
-RGBA toRGBA(in const Color color);
+RGBA toRGBA8(in const Color color);
 
 // Textures
 
@@ -190,8 +190,24 @@ struct Ray
 	Line line;
 };
 
-Ray shootRayAt(in const UV);
 Color seenColor(in const Ray ray);
+
+// Camera
+
+struct Camera
+{
+	Position origin;
+	Position lowerLeftCorner;
+	Position horizontal;
+	Position vertical;
+	Displacement w;
+	Displacement u;
+	Displacement v;
+	float lensRadius;
+	MinMax time;
+};
+
+Ray shootRayAt(in const UV);
 
 // Hit detection
 
@@ -214,27 +230,14 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 
 // I/O
 
-layout(set = 0, binding = 0) buffer Image
+layout(push_constant) uniform RenderInfo
 {
-	UintExtent2D size;
+	UintExtent2D imageExtent;
 	uint sampleCount;
-	RGBA pixels[];
-} outImage;
+	Camera camera;
+} renderInfo;
 
-layout(set = 0, binding = 1) readonly uniform Camera
-{
-	Position origin;
-	Position lowerLeftCorner;
-	Position horizontal;
-	Position vertical;
-	Displacement w;
-	Displacement u;
-	Displacement v;
-	float lensRadius;
-	MinMax time;
-} camera;
-
-layout(set = 0, binding = 2) readonly uniform Scene
+layout(binding = 0) readonly uniform Scene
 { 
 	Shape shapes[];
 	SphereShape sphereShapes[];
@@ -250,32 +253,35 @@ layout(set = 0, binding = 2) readonly uniform Scene
 	NoiseTexture noiseTextures[];
 
 	Texture sky;
-	Camera camera;
 } scene;
 
-layout(set = 0, binding = 3) uniform sampler2D textureImages[];
+layout(binding = 1) readonly uniform TextureImages
+{
+	RGBA pixels[];
+} textureImages[];
 
-const float inverseImageWidth = 1.f / outImage.size.width;
-const float inverseImageHeight = 1.f / outImage.size.height;
+layout(binding = 2, rgba8ui) uniform writeonly uimage2D outImage;
 
 // IMPLEMENTATIONS
 
 void main()
 {
+	const float inverseImageWidth = 1.f / float(renderInfo.imageExtent.width);
+	const float inverseImageHeight = 1.f / float(renderInfo.imageExtent.height);
+
 	vec3 color;
-	for (uint i = 0; i < outImage.sampleCount; ++i)
+	for (uint i = 0; i < renderInfo.sampleCount; ++i)
 	{
 		const UV uv = {
 			gl_GlobalInvocationID.x * inverseImageWidth,
-			(outImage.size.height - gl_GlobalInvocationID.y) * inverseImageHeight
+			(renderInfo.imageExtent.height - gl_GlobalInvocationID.y) * inverseImageHeight
 		};
 		const Ray ray = shootRayAt(uv);
 		color += seenColor(ray);
 	}
-	color /= float(outImage.sampleCount);
+	color /= float(renderInfo.sampleCount);
 
-	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * outImage.size.width;
-	outImage.pixels[pixelIndex] = toRGBA(color);
+	imageStore(outImage, ivec2(gl_GlobalInvocationID.xy), toRGBA8(color));
 }
 
 // Ray
@@ -327,17 +333,17 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 
 Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position)
 {
-	switch (tex.type)
-	{
-	case TEXTURE_TYPE_CHECKER:
-		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_CONSTANT:
-		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_IMAGE:
-		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
-	case TEXTURE_TYPE_NOISE:
-		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
-	}
+//	switch (tex.type)
+//	{
+//	case TEXTURE_TYPE_CHECKER:
+//		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_CONSTANT:
+//		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_IMAGE:
+//		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
+//	case TEXTURE_TYPE_NOISE:
+//		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
+//	}
 	return Color(1.f);
 }
 
@@ -367,12 +373,9 @@ Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Posit
 
 // Colors
 
-RGBA toRGBA(in const Color color)
+RGBA toRGBA8(in const Color color)
 {
-	return
-		(uint(color.r * 255) <<  0) |
-		(uint(color.g * 255) <<  8) |
-		(uint(color.b * 255) << 16) | 0xff000000;
+	return uvec4(color * 255, 255);
 }
 
 // Geometric

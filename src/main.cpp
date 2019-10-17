@@ -1,3 +1,5 @@
+#define VMA_IMPLEMENTATION
+
 #include <render_plan.hpp>
 #include <renderer/cpu.hpp>
 #include <renderer/vulkan.hpp>
@@ -11,7 +13,7 @@
 #include <string>
 
 using namespace std::string_literals;
-#pragma clang optimize off
+
 void export_image(const std::vector<rgba>& image, const extent_2d<uint32_t> image_size,
     const std::string_view path)
 {
