@@ -57,9 +57,6 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
 {
     this->create_instance();
     this->setup_devices();
-    this->setup_pipeline();
-    this->create_descriptor_sets();
-    this->create_command_pool();
 }
 
 vulkan_renderer::~vulkan_renderer()
@@ -69,6 +66,10 @@ vulkan_renderer::~vulkan_renderer()
 
 std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 {
+    this->setup_pipeline(plan);
+    this->create_descriptor_sets();
+    this->create_command_pool();
+
     const vk::Extent3D image_extent = { plan.image_size.width, plan.image_size.height, 1 };
     std::vector<rgba> image{ image_extent.width * image_extent.height, rgba{ 1 } };
 
@@ -340,7 +341,7 @@ void vulkan_renderer::setup_devices()
     std::cout << "Done." << std::endl;
 }
 
-void vulkan_renderer::setup_pipeline()
+void vulkan_renderer::setup_pipeline(const render_plan& plan)
 {
     std::cout << "Setting up descriptor set layout... ";
 
@@ -386,7 +387,7 @@ void vulkan_renderer::setup_pipeline()
     this->compute_pipeline = this->device->createComputePipelineUnique(nullptr, vk::ComputePipelineCreateInfo{}
         .setStage(vk::PipelineShaderStageCreateInfo{}
             .setStage(vk::ShaderStageFlagBits::eCompute)
-            .setModule(*this->load_shader_module("shaders/raytracer.comp"))
+            .setModule(*this->load_shader_module("shaders/raytracer.comp", plan))
             .setPName("main"))
         .setLayout(*this->pipeline_layout));
 
@@ -433,7 +434,7 @@ void vulkan_renderer::create_command_pool()
     std::cout << "Done." << std::endl;
 }
 
-vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path) const
+vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path, const render_plan& plan) const
 {
     std::ifstream file{ code_path.data(), std::ios::ate };
     if (!file.is_open())
@@ -460,7 +461,7 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
     string_replace_all(code, "@SCENE_IMAGE_TEXTURES_COUNT@", std::to_string(1));
     string_replace_all(code, "@SCENE_NOISE_TEXTURES_COUNT@", std::to_string(1));
 
-    std::cout << std::endl << "Compiling shaders... ";
+    std::cout << std::endl << "Compiling shader... ";
 
     shaderc::Compiler compiler;
     const shaderc::SpvCompilationResult compilation_result = compiler.CompileGlslToSpv(

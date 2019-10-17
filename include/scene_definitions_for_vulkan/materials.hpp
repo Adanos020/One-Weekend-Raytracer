@@ -1,7 +1,7 @@
 #pragma once
 
+#include <scene_definitions_for_vulkan/textures.hpp>
 #include <util/numeric_types.hpp>
-#include <textures.hpp>
 
 enum class material_type
 {

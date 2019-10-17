@@ -27,12 +27,12 @@ public:
 private:
     void create_instance();
     void setup_devices();
-    void setup_pipeline();
+    void setup_pipeline(const struct render_plan&);
     void create_descriptor_sets();
     void create_command_pool();
 
 private:
-    vk::UniqueShaderModule load_shader_module(const std::string_view code_path) const;
+    vk::UniqueShaderModule load_shader_module(const std::string_view code_path, const struct render_plan&) const;
 
 private:
     const uint32_t sample_count;
