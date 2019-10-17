@@ -1,5 +1,6 @@
 #include <renderer/vulkan.hpp>
 #include <render_plan.hpp>
+#include <util/vk_single_time_commands.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -9,8 +10,6 @@
 #include <vector>
 
 using namespace std::string_literals;
-
-#pragma clang optimize off
 
 // Helpers
 
@@ -92,46 +91,77 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     const vk::DeviceSize scene_buffer_size = 1;
     const vk::DeviceSize texture_images_buffer_size = 1;
-    const vk::DeviceSize image_buffer_size = image.size() * sizeof(rgba);
+    const vk::DeviceSize output_image_size = image.size() * sizeof(rgba);
 
     std::cout << "scene... ";
 
     auto [scene_buffer, scene_allocation] = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
             .setSize(scene_buffer_size)
-            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
             .setSharingMode(vk::SharingMode::eExclusive),
         vma::AllocationCreateInfo{}
-            .setUsage(vma::MemoryUsage::eGpuOnly)
-            .setRequiredFlags(vk::MemoryPropertyFlagBits::eHostVisible)
-            .setPreferredFlags(vk::MemoryPropertyFlagBits::eHostCoherent));
+            .setUsage(vma::MemoryUsage::eGpuOnly));
 
     std::cout << "texture images... ";
 
     auto [texture_images_buffer, texture_images_allocation] = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
             .setSize(texture_images_buffer_size)
-            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
             .setSharingMode(vk::SharingMode::eExclusive),
         vma::AllocationCreateInfo{}
-            .setUsage(vma::MemoryUsage::eGpuOnly)
-            .setRequiredFlags(vk::MemoryPropertyFlagBits::eHostVisible)
-            .setPreferredFlags(vk::MemoryPropertyFlagBits::eHostCoherent));
+            .setUsage(vma::MemoryUsage::eGpuOnly));
 
     std::cout << "output image... ";
 
-    auto [image_buffer, image_allocation] = this->memory_allocator.createBuffer(
-        vk::BufferCreateInfo{}
-            .setSize(image_buffer_size)
-            .setUsage(vk::BufferUsageFlagBits::eStorageBuffer)
-            .setSharingMode(vk::SharingMode::eExclusive),
+    auto [output_image, image_allocation] = this->memory_allocator.createImage(
+        vk::ImageCreateInfo{}
+            .setImageType(vk::ImageType::e2D)
+            .setExtent(vk::Extent3D{ plan.image_size.width, plan.image_size.height, 1 })
+            .setMipLevels(1)
+            .setArrayLayers(1)
+            .setFormat(vk::Format::eR8G8B8A8Uint)
+            .setTiling(vk::ImageTiling::eOptimal)
+            .setInitialLayout(vk::ImageLayout::eUndefined)
+            .setUsage(vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc)
+            .setSharingMode(vk::SharingMode::eExclusive)
+            .setSamples(vk::SampleCountFlagBits::e1),
         vma::AllocationCreateInfo{}
-            .setUsage(vma::MemoryUsage::eGpuToCpu)
-            .setRequiredFlags(vk::MemoryPropertyFlagBits::eHostVisible)
-            .setPreferredFlags(vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostCoherent)
-            .setFlags(vma::AllocationCreateFlagBits::eMapped));
+            .setUsage(vma::MemoryUsage::eGpuOnly));
+    vk::UniqueImageView output_image_view = this->device->createImageViewUnique(vk::ImageViewCreateInfo{}
+        .setImage(output_image)
+        .setViewType(vk::ImageViewType::e2D)
+        .setFormat(vk::Format::eR8G8B8A8Uint)
+        .setSubresourceRange(vk::ImageSubresourceRange{}
+            .setAspectMask(vk::ImageAspectFlagBits::eColor)
+            .setBaseMipLevel(0)
+            .setLevelCount(1)
+            .setBaseArrayLayer(0)
+            .setLayerCount(1)));
+    {
+        vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
+        transition_layout.command_buffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader,
+            vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
+                .setOldLayout(vk::ImageLayout::eUndefined)
+                .setNewLayout(vk::ImageLayout::eGeneral)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(output_image)
+                .setSubresourceRange(vk::ImageSubresourceRange{}
+                    .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                    .setBaseMipLevel(0)
+                    .setLevelCount(1)
+                    .setBaseArrayLayer(0)
+                    .setLayerCount(1)));
+    }
+
+    std::cout << "Done." << std::endl;
 
     // Create descriptor sets
+
+    std::cout << "Updating descriptor sets... ";
 
     const auto scene_descriptor_info = vk::DescriptorBufferInfo{}
         .setBuffer(scene_buffer)
@@ -139,9 +169,9 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     const auto texture_images_descriptor_info = vk::DescriptorBufferInfo{}
         .setBuffer(texture_images_buffer)
         .setRange(VK_WHOLE_SIZE);
-    const auto image_descriptor_info = vk::DescriptorBufferInfo{}
-        .setBuffer(image_buffer)
-        .setRange(VK_WHOLE_SIZE);
+    const auto image_descriptor_info = vk::DescriptorImageInfo{}
+        .setImageLayout(vk::ImageLayout::eGeneral)
+        .setImageView(*output_image_view);
 
     for (size_t i = 0; i < this->descriptor_sets.size(); ++i)
     {
@@ -161,9 +191,9 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             vk::WriteDescriptorSet{}
                 .setDstBinding(2)
                 .setDstSet(*this->descriptor_sets[i])
-                .setDescriptorType(vk::DescriptorType::eStorageBuffer)
+                .setDescriptorType(vk::DescriptorType::eStorageImage)
                 .setDescriptorCount(1)
-                .setPBufferInfo(&image_descriptor_info),
+                .setPImageInfo(&image_descriptor_info),
         };
         this->device->updateDescriptorSets(descriptor_writes, nullptr);
     }
@@ -191,7 +221,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
         command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eCompute, *this->pipeline_layout, 0,
             1, &*this->descriptor_sets[i],
             0, {});
-        
+
         command_buffer->pushConstants(*this->pipeline_layout, vk::ShaderStageFlagBits::eCompute,
             0, sizeof(render_info), &info);
         
@@ -205,18 +235,61 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     this->compute_queue.waitIdle();
 
-    { // Retrieve image
-        void* data = this->memory_allocator.mapMemory(image_allocation);
-        std::memcpy(image.data(), data, image_buffer_size);
-        this->memory_allocator.unmapMemory(image_allocation);
+    std::cout << "Done." << std::endl;
+    std::cout << "Retrieving image... ";
+
+    {
+        vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
+        transition_layout.command_buffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
+            vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
+            .setOldLayout(vk::ImageLayout::eGeneral)
+            .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setImage(output_image)
+            .setSubresourceRange(vk::ImageSubresourceRange{}
+                .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                .setBaseMipLevel(0)
+                .setLevelCount(1)
+                .setBaseArrayLayer(0)
+                .setLayerCount(1)));
     }
+
+    // Retrieve image
+    auto [staging_buffer, staging_allocation] = this->memory_allocator.createBuffer(
+        vk::BufferCreateInfo{}
+            .setSize(output_image_size)
+            .setUsage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst)
+            .setSharingMode(vk::SharingMode::eExclusive),
+        vma::AllocationCreateInfo{}
+            .setUsage(vma::MemoryUsage::eCpuOnly));
+    {
+        vk_single_time_commands retrieve_image{ *this->device, this->compute_queue, *this->command_pool };
+        retrieve_image.command_buffer.copyImageToBuffer(output_image, vk::ImageLayout::eTransferSrcOptimal,
+            staging_buffer, vk::BufferImageCopy{}
+                .setBufferOffset(0)
+                .setBufferRowLength(0)
+                .setBufferImageHeight(0)
+                .setImageSubresource(vk::ImageSubresourceLayers{}
+                    .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                    .setMipLevel(0)
+                    .setBaseArrayLayer(0)
+                    .setLayerCount(1))
+                .setImageOffset(vk::Offset3D{ 0, 0, 0 })
+                .setImageExtent(vk::Extent3D{ plan.image_size.width, plan.image_size.height, 1 }));
+    }
+    void* output_data = this->memory_allocator.mapMemory(staging_allocation);
+    std::memcpy(image.data(), output_data, output_image_size);
+    this->memory_allocator.unmapMemory(staging_allocation);
+    this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
     
     std::cout << "Done." << std::endl;
 
     // Cleanup
     this->memory_allocator.destroyBuffer(scene_buffer, scene_allocation);
     this->memory_allocator.destroyBuffer(texture_images_buffer, texture_images_allocation);
-    this->memory_allocator.destroyBuffer(image_buffer, image_allocation);
+    this->memory_allocator.destroyImage(output_image, image_allocation);
 
     return image;
 }
@@ -303,7 +376,7 @@ void vulkan_renderer::setup_pipeline()
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
         vk::DescriptorSetLayoutBinding{} // outImage
             .setBinding(2)
-            .setDescriptorType(vk::DescriptorType::eStorageBuffer)
+            .setDescriptorType(vk::DescriptorType::eStorageImage)
             .setDescriptorCount(1)
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
     };
@@ -350,7 +423,7 @@ void vulkan_renderer::create_descriptor_sets()
             .setType(vk::DescriptorType::eUniformBuffer)
             .setDescriptorCount(2),
         vk::DescriptorPoolSize{} // outImage
-            .setType(vk::DescriptorType::eStorageBuffer)
+            .setType(vk::DescriptorType::eStorageImage)
             .setDescriptorCount(1),
     };
 

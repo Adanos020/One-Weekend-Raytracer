@@ -79,9 +79,9 @@ UV uvOnSphere(in const Position normalizedP);
 
 #define Color vec3		// Normalized color.
 #define ColorAlpha vec4	// Normalized color with an alpha channel.
-#define RGBA uint		// RGBA color representation with integer values between 0 and 255.
+#define RGBA uvec4		// RGBA color representation with integer values between 0 and 255.
 
-RGBA toRGBA(in const Color color);
+RGBA toRGBA8(in const Color color);
 
 // Textures
 
@@ -237,7 +237,7 @@ layout(push_constant) uniform RenderInfo
 	Camera camera;
 } renderInfo;
 
-layout(set = 0, binding = 0) readonly uniform Scene
+layout(binding = 0) readonly uniform Scene
 { 
 	Shape shapes[];
 	SphereShape sphereShapes[];
@@ -255,15 +255,12 @@ layout(set = 0, binding = 0) readonly uniform Scene
 	Texture sky;
 } scene;
 
-layout(set = 0, binding = 1) readonly uniform TextureImages
+layout(binding = 1) readonly uniform TextureImages
 {
 	RGBA pixels[];
 } textureImages[];
 
-layout(set = 0, binding = 2) buffer Image
-{
-	RGBA pixels[];
-} outImage;
+layout(binding = 2, rgba8ui) uniform writeonly uimage2D outImage;
 
 // IMPLEMENTATIONS
 
@@ -284,8 +281,7 @@ void main()
 	}
 	color /= float(renderInfo.sampleCount);
 
-	const ArrayIndex pixelIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * renderInfo.imageExtent.width;
-	outImage.pixels[pixelIndex] = toRGBA(color);
+	imageStore(outImage, ivec2(gl_GlobalInvocationID.xy), toRGBA8(color));
 }
 
 // Ray
@@ -377,12 +373,9 @@ Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Posit
 
 // Colors
 
-RGBA toRGBA(in const Color color)
+RGBA toRGBA8(in const Color color)
 {
-	return
-		(uint(color.r * 255) <<  0) |
-		(uint(color.g * 255) <<  8) |
-		(uint(color.b * 255) << 16) | 0xff000000;
+	return uvec4(color * 255, 255);
 }
 
 // Geometric
