@@ -1,5 +1,7 @@
 #include <scene_definitions_for_vulkan/scene.hpp>
 
+#include <cstring>
+
 std::vector<uint8_t> scene::to_bytes() const
 {
     const size_t sky_size = sizeof(texture);

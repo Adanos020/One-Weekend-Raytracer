@@ -335,7 +335,7 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 			const Position point = pointOnLine(ray.line, root);
 			const UV uv = uvOnSphere(abs(1 / shapeData.radius) * (point - shapeData.origin));
 			const Direction normal = (point - shapeData.origin) / shapeData.radius;
-			return HitRecord(true, Hit(root, point, normal, sphere.material, uv));
+			return HitRecord(true, Hit(root, point, normal, Material(0, 0), uv));
 		}
 	}
 	return HitRecord(false, Hit(0, Position(0), Displacement(0), Material(0, 0), UV(0, 0)));
