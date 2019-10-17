@@ -1,6 +1,9 @@
 #include <renderer/vulkan.hpp>
 #include <render_plan.hpp>
+#include <util/string.hpp>
 #include <util/vk_single_time_commands.hpp>
+
+#include <shaderc/shaderc.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -383,7 +386,7 @@ void vulkan_renderer::setup_pipeline()
     this->compute_pipeline = this->device->createComputePipelineUnique(nullptr, vk::ComputePipelineCreateInfo{}
         .setStage(vk::PipelineShaderStageCreateInfo{}
             .setStage(vk::ShaderStageFlagBits::eCompute)
-            .setModule(*this->load_shader_module("shaders/raytracer.comp.spv"))
+            .setModule(*this->load_shader_module("shaders/raytracer.comp"))
             .setPName("main"))
         .setLayout(*this->pipeline_layout));
 
@@ -432,20 +435,45 @@ void vulkan_renderer::create_command_pool()
 
 vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path) const
 {
-    std::ifstream file{ code_path.data(), std::ios::ate | std::ios::binary };
+    std::ifstream file{ code_path.data(), std::ios::ate };
     if (!file.is_open())
     {
         throw std::runtime_error("Failed to open file "s + code_path.data());
     }
 
     const size_t file_size = file.tellg();
-    std::vector<char> buffer(file_size);
-
     file.seekg(0);
-    file.read(buffer.data(), file_size);
+
+    std::string code;
+    code.reserve(file_size);
+    code.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
     file.close();
 
+    string_replace_all(code, "@SCENE_SHAPES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_SPHERE_SHAPES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_DIELECTRIC_MATERIALS_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_LAMBERTIAN_MATERIALS_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_METAL_MATERIALS_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_CHECKER_TEXTURES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_CONSTANT_TEXTURES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_IMAGE_TEXTURES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_NOISE_TEXTURES_COUNT@", std::to_string(1));
+
+    std::cout << std::endl << "Compiling shaders... ";
+
+    shaderc::Compiler compiler;
+    const shaderc::SpvCompilationResult compilation_result = compiler.CompileGlslToSpv(
+        code, shaderc_shader_kind::shaderc_compute_shader, code_path.data());
+    if (compilation_result.GetCompilationStatus() != shaderc_compilation_status_success)
+    {
+        throw std::runtime_error(compilation_result.GetErrorMessage());
+    }
+    std::vector<uint32_t> spv(compilation_result.cbegin(), compilation_result.cend());
+
+    std::cout << "Done." << std::endl;
+
     return this->device->createShaderModuleUnique(vk::ShaderModuleCreateInfo{}
-        .setCodeSize(buffer.size())
-        .setPCode(reinterpret_cast<const uint32_t*>(buffer.data())));
+        .setCodeSize(spv.size() * sizeof(uint32_t))
+        .setPCode(spv.data()));
 }

@@ -27,7 +27,7 @@ line camera::shoot_ray_at(const float s, const float t) const
     const displacement offset = (this->u * random_spot_on_lens.x) + (this->v * random_spot_on_lens.y);
     return line{
         this->origin + offset,
-        this->lower_left_corner + (s * this->horizontal) + (t * this->vertical) - origin - offset,
+        this->lower_left_corner + (s * this->horizontal) + (t * this->vertical) - this->origin - offset,
         random_uniform(this->time.min, this->time.max)
     };
 }

@@ -46,7 +46,7 @@ int main()
     try
     {
         const extent_2d<uint32_t> image_size = { 1600, 900 };
-        const render_plan plan = render_plan::random_balls(image_size);
+        const render_plan plan = render_plan::two_noise_spheres(image_size);
 
         const std::vector<rgba> image = vulkan_renderer{ 1000 }.render_scene(plan);
         export_image(image, image_size, "test.png");

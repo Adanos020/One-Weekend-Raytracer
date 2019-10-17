@@ -1,5 +1,16 @@
-#version 450
+#version 450 core
 #extension GL_ARB_separate_shader_objects : enable
+
+#define SCENE_SHAPES_COUNT				    @SCENE_SHAPES_COUNT@
+#define SCENE_SPHERE_SHAPES_COUNT		    @SCENE_SPHERE_SHAPES_COUNT@
+#define SCENE_DIELECTRIC_MATERIALS_COUNT    @SCENE_DIELECTRIC_MATERIALS_COUNT@
+#define SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT @SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT@
+#define SCENE_LAMBERTIAN_MATERIALS_COUNT    @SCENE_LAMBERTIAN_MATERIALS_COUNT@
+#define SCENE_METAL_MATERIALS_COUNT		    @SCENE_METAL_MATERIALS_COUNT@
+#define SCENE_CHECKER_TEXTURES_COUNT	    @SCENE_CHECKER_TEXTURES_COUNT@
+#define SCENE_CONSTANT_TEXTURES_COUNT	    @SCENE_CONSTANT_TEXTURES_COUNT@
+#define SCENE_IMAGE_TEXTURES_COUNT		    @SCENE_IMAGE_TEXTURES_COUNT@
+#define SCENE_NOISE_TEXTURES_COUNT		    @SCENE_NOISE_TEXTURES_COUNT@
 
 // TYPE DEFINITIONS
 
@@ -13,11 +24,6 @@ const float pi = 3.14159265358979323846264338327950288;
 const float halfPi = 1.57079632679489661923132169163975144;
 const float oneOverPi = 0.318309886183790671537767526745028724;
 const float oneOverTwoPi = 0.159154943091895335768883763372514362;
-
-// Random
-
-float randomUniform();
-float randomUniform(in const float lo, in const float hi);
 
 // Sizes
 
@@ -56,6 +62,14 @@ struct UV
 const Direction X_AXIS = Direction(1, 0, 0);
 const Direction Y_AXIS = Direction(0, 1, 0);
 const Direction Z_AXIS = Direction(0, 0, 1);
+
+// Random
+
+float randomUniform();
+float randomUniform(in const float lo, in const float hi);
+Direction randomDirection();
+Direction randomInUnitDisk(in const Direction axis);
+Direction randomInUnitDisk();
 
 // Geometric types
 
@@ -238,27 +252,24 @@ layout(push_constant) uniform RenderInfo
 } renderInfo;
 
 layout(binding = 0) readonly uniform Scene
-{ 
-	Shape shapes[];
-	SphereShape sphereShapes[];
+{
+	Shape shapes[SCENE_SHAPES_COUNT];
+	SphereShape sphereShapes[SCENE_SPHERE_SHAPES_COUNT];
 
-	DielectricMaterial dielectricMaterials[];
-	DiffuseLightMaterial diffuseLightMaterials[];
-	LambertianMaterial lambertianMaterials[];
-	MetalMaterial metalMaterials[];
+	DielectricMaterial dielectricMaterials[SCENE_DIELECTRIC_MATERIALS_COUNT];
+	DiffuseLightMaterial diffuseLightMaterials[SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT];
+	LambertianMaterial lambertianMaterials[SCENE_LAMBERTIAN_MATERIALS_COUNT];
+	MetalMaterial metalMaterials[SCENE_METAL_MATERIALS_COUNT];
 
-	CheckerTexture checkerTextures[];
-	ConstantTexture constantTextures[];
-	ImageTexture imageTextures[];
-	NoiseTexture noiseTextures[];
+	CheckerTexture checkerTextures[SCENE_CHECKER_TEXTURES_COUNT];
+	ConstantTexture constantTextures[SCENE_CONSTANT_TEXTURES_COUNT];
+	ImageTexture imageTextures[SCENE_IMAGE_TEXTURES_COUNT];
+	NoiseTexture noiseTextures[SCENE_NOISE_TEXTURES_COUNT];
 
 	Texture sky;
 } scene;
 
-layout(binding = 1) readonly uniform TextureImages
-{
-	RGBA pixels[];
-} textureImages[];
+layout(binding = 1) uniform sampler2D textures[];
 
 layout(binding = 2, rgba8ui) uniform writeonly uimage2D outImage;
 
@@ -273,8 +284,8 @@ void main()
 	for (uint i = 0; i < renderInfo.sampleCount; ++i)
 	{
 		const UV uv = {
-			gl_GlobalInvocationID.x * inverseImageWidth,
-			(renderInfo.imageExtent.height - gl_GlobalInvocationID.y) * inverseImageHeight
+			float(gl_GlobalInvocationID.x + randomUniform()) * inverseImageWidth,
+			float(renderInfo.imageExtent.height - gl_GlobalInvocationID.y + randomUniform()) * inverseImageHeight,
 		};
 		const Ray ray = shootRayAt(uv);
 		color += seenColor(ray);
@@ -286,18 +297,19 @@ void main()
 
 // Ray
 
-Ray shootRayAt(in const UV)
+Ray shootRayAt(in const UV uv)
 {
-	return Ray(Line(Position(0), Displacement(0)));
+	const Camera camera = renderInfo.camera;
+	const Displacement randomSpotOnLens = camera.lensRadius * randomInUnitDisk();
+	const Displacement offset = (camera.u * randomSpotOnLens.x) + (camera.v * randomSpotOnLens.y);
+	const Position origin = camera.origin + offset;
+	return Ray(Line(origin, camera.lowerLeftCorner + (uv.v * camera.horizontal) + (uv.u * camera.vertical) - origin));
 }
 
 Color seenColor(in const Ray ray)
 {
-	//return scene.sky
-	return vec3(
-		0.5 * (1 + sin(radians(gl_GlobalInvocationID.x))),
-		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y))),
-		0.5 * (1 + sin(radians(gl_GlobalInvocationID.y)) * sin(radians(gl_GlobalInvocationID.x))));;
+	const float t = (0.5f * normalize(ray.line.direction).y) + 0.5f;
+	return mix(Color(1.f), Color(0.5f, 0.7f, 1.f), t);
 }
 
 // Shapes
@@ -404,4 +416,35 @@ float randomUniform()
 float randomUniform(in const float lo, in const float hi)
 {
 	return lo + (randomUniform() * (hi - lo));
+}
+
+Direction randomDirection()
+{
+	while (true)
+	{
+		const Displacement direction = Displacement(
+			randomUniform(-1.f, 1.f), randomUniform(-1.f, 1.f), randomUniform(-1.f, 1.f));
+		const float l = length(direction);
+		if (l * l < 1.f)
+		{
+			return direction;
+		}
+	}
+}
+
+Direction randomInUnitDisk(in const Direction axis)
+{
+	while (true)
+	{
+		const Displacement direction = (Direction(1.f) - axis) * randomDirection();
+		if (dot(direction, direction) < 1.f)
+		{
+			return direction;
+		}
+	}
+}
+
+Direction randomInUnitDisk()
+{
+	return randomInUnitDisk(Z_AXIS);
 }
