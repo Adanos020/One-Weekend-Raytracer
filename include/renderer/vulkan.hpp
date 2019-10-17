@@ -32,7 +32,7 @@ private:
     void create_command_pool();
 
 private:
-    vk::UniqueShaderModule load_shader_module(const std::string_view code_path);
+    vk::UniqueShaderModule load_shader_module(const std::string_view code_path) const;
 
 private:
     const uint32_t sample_count;

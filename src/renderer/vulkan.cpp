@@ -47,23 +47,6 @@ std::optional<uint32_t> find_compute_queue_family(const vk::PhysicalDevice& devi
     return {};
 }
 
-uint32_t find_memory_type(const vk::PhysicalDevice& physical_device, const uint32_t type_filter,
-    const vk::MemoryPropertyFlags properties)
-{
-    const vk::PhysicalDeviceMemoryProperties memory_properties = physical_device.getMemoryProperties();
-
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
-    {
-        const vk::MemoryPropertyFlags memory_type_flags = memory_properties.memoryTypes[i].propertyFlags;
-        if ((type_filter & (1 << i)) && (memory_type_flags & properties) == properties)
-        {
-            return i;
-        }
-    }
-
-    throw std::runtime_error("Failed to find a sufficient memory type.");
-}
-
 // Implementation
 
 vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
@@ -83,17 +66,13 @@ vulkan_renderer::~vulkan_renderer()
 
 std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 {
-    std::vector<rgba> image{ plan.image_size.width * plan.image_size.height, rgba{ 1 } };
-
-    // Create buffers
-
-    std::cout << "Creating buffers for ";
+    const vk::Extent3D image_extent = { plan.image_size.width, plan.image_size.height, 1 };
+    std::vector<rgba> image{ image_extent.width * image_extent.height, rgba{ 1 } };
 
     const vk::DeviceSize scene_buffer_size = 1;
     const vk::DeviceSize texture_images_buffer_size = 1;
-    const vk::DeviceSize output_image_size = image.size() * sizeof(rgba);
 
-    std::cout << "scene... ";
+    std::cout << "Allocating memory for scene... ";
 
     auto [scene_buffer, scene_allocation] = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
@@ -118,7 +97,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     auto [output_image, image_allocation] = this->memory_allocator.createImage(
         vk::ImageCreateInfo{}
             .setImageType(vk::ImageType::e2D)
-            .setExtent(vk::Extent3D{ plan.image_size.width, plan.image_size.height, 1 })
+            .setExtent(image_extent)
             .setMipLevels(1)
             .setArrayLayers(1)
             .setFormat(vk::Format::eR8G8B8A8Uint)
@@ -158,9 +137,6 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     }
 
     std::cout << "Done." << std::endl;
-
-    // Create descriptor sets
-
     std::cout << "Updating descriptor sets... ";
 
     const auto scene_descriptor_info = vk::DescriptorBufferInfo{}
@@ -199,18 +175,14 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     }
 
     std::cout << "Done." << std::endl;
-
-    // Record commands to buffers and execute
-
     std::cout << "Rendering scene... ";
 
     std::vector<vk::UniqueCommandBuffer> command_buffers = this->device->allocateCommandBuffersUnique(
         vk::CommandBufferAllocateInfo{}
             .setCommandPool(*this->command_pool)
             .setLevel(vk::CommandBufferLevel::ePrimary)
-            .setCommandBufferCount(1));
+            .setCommandBufferCount(this->descriptor_sets.size()));
 
-    const render_info info = { plan.image_size, this->sample_count, plan.cam };
     for (size_t i = 0; i < command_buffers.size(); ++i)
     {
         vk::UniqueCommandBuffer& command_buffer = command_buffers[i];
@@ -222,8 +194,9 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             1, &*this->descriptor_sets[i],
             0, {});
 
+        const render_info render_meta = { plan.image_size, this->sample_count, plan.cam };
         command_buffer->pushConstants(*this->pipeline_layout, vk::ShaderStageFlagBits::eCompute,
-            0, sizeof(render_info), &info);
+            0, sizeof(render_info), &render_meta);
         
         command_buffer->dispatch(plan.image_size.width, plan.image_size.height, 1);
         command_buffer->end();
@@ -238,7 +211,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Done." << std::endl;
     std::cout << "Retrieving image... ";
 
-    {
+    { // Transfer image layout
         vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
         transition_layout.command_buffer.pipelineBarrier(
             vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
@@ -257,6 +230,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     }
 
     // Retrieve image
+    const vk::DeviceSize output_image_size = image.size() * sizeof(rgba);
     auto [staging_buffer, staging_allocation] = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
             .setSize(output_image_size)
@@ -277,7 +251,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
                     .setBaseArrayLayer(0)
                     .setLayerCount(1))
                 .setImageOffset(vk::Offset3D{ 0, 0, 0 })
-                .setImageExtent(vk::Extent3D{ plan.image_size.width, plan.image_size.height, 1 }));
+                .setImageExtent(image_extent));
     }
     void* output_data = this->memory_allocator.mapMemory(staging_allocation);
     std::memcpy(image.data(), output_data, output_image_size);
@@ -299,8 +273,10 @@ void vulkan_renderer::create_instance()
     using MsgSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT;
     using MsgType = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
+    std::cout << "Creating Vulkan instance... ";
+
     const auto application_info = vk::ApplicationInfo{}
-    .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
+        .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
     const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
         .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
         .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
@@ -316,6 +292,8 @@ void vulkan_renderer::create_instance()
     this->dispatch.init(*this->vulkan_instance);
     this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
         debug_messenger_info, nullptr, this->dispatch);
+
+    std::cout << "Done." << std::endl;
 }
 
 void vulkan_renderer::setup_devices()
@@ -361,7 +339,7 @@ void vulkan_renderer::setup_devices()
 
 void vulkan_renderer::setup_pipeline()
 {
-    std::cout << "Setting up ";
+    std::cout << "Setting up descriptor set layout... ";
 
     const std::vector<vk::DescriptorSetLayoutBinding> bindings = {
          vk::DescriptorSetLayoutBinding{} // scene
@@ -380,8 +358,6 @@ void vulkan_renderer::setup_pipeline()
             .setDescriptorCount(1)
             .setStageFlags(vk::ShaderStageFlagBits::eCompute),
     };
-
-    std::cout << "set layout... ";
 
     this->set_layout = this->device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo{}
         .setBindingCount(bindings.size())
@@ -454,7 +430,7 @@ void vulkan_renderer::create_command_pool()
     std::cout << "Done." << std::endl;
 }
 
-vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path)
+vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_view code_path) const
 {
     std::ifstream file{ code_path.data(), std::ios::ate | std::ios::binary };
     if (!file.is_open())
