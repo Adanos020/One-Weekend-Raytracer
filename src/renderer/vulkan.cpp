@@ -114,6 +114,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setSamples(vk::SampleCountFlagBits::e1),
         vma::AllocationCreateInfo{}
             .setUsage(vma::MemoryUsage::eGpuOnly));
+
     vk::UniqueImageView output_image_view = this->device->createImageViewUnique(vk::ImageViewCreateInfo{}
         .setImage(output_image)
         .setViewType(vk::ImageViewType::e2D)
@@ -124,23 +125,9 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setLevelCount(1)
             .setBaseArrayLayer(0)
             .setLayerCount(1)));
-    {
-        vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
-        transition_layout.command_buffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader,
-            vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
-                .setOldLayout(vk::ImageLayout::eUndefined)
-                .setNewLayout(vk::ImageLayout::eGeneral)
-                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setImage(output_image)
-                .setSubresourceRange(vk::ImageSubresourceRange{}
-                    .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                    .setBaseMipLevel(0)
-                    .setLevelCount(1)
-                    .setBaseArrayLayer(0)
-                    .setLayerCount(1)));
-    }
+
+    this->transfer_image(output_image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+        vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader);
 
     std::cout << "Done." << std::endl;
     std::cout << "Updating descriptor sets... ";
@@ -217,25 +204,9 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Done." << std::endl;
     std::cout << "Retrieving image... ";
 
-    { // Transfer image layout
-        vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
-        transition_layout.command_buffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
-            vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
-                .setOldLayout(vk::ImageLayout::eGeneral)
-                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
-                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-                .setImage(output_image)
-                .setSubresourceRange(vk::ImageSubresourceRange{}
-                    .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                    .setBaseMipLevel(0)
-                    .setLevelCount(1)
-                    .setBaseArrayLayer(0)
-                    .setLayerCount(1)));
-    }
+    this->transfer_image(output_image, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+        vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost);
 
-    // Retrieve image
     const vk::DeviceSize output_image_size = image.size() * sizeof(rgba);
     auto [staging_buffer, staging_allocation] = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
@@ -486,4 +457,25 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
     return this->device->createShaderModuleUnique(vk::ShaderModuleCreateInfo{}
         .setCodeSize(spv.size() * sizeof(uint32_t))
         .setPCode(spv.data()));
+}
+
+void vulkan_renderer::transfer_image(vk::Image& image, const vk::ImageLayout old_layout,
+    const vk::ImageLayout new_layout, const vk::PipelineStageFlagBits src_stage,
+    const vk::PipelineStageFlagBits dst_stage)
+{
+    vk_single_time_commands transition_layout{ *this->device, this->compute_queue, *this->command_pool };
+    transition_layout.command_buffer.pipelineBarrier(
+        src_stage, dst_stage,
+        vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
+        .setOldLayout(old_layout)
+        .setNewLayout(new_layout)
+        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setImage(image)
+        .setSubresourceRange(vk::ImageSubresourceRange{}
+            .setAspectMask(vk::ImageAspectFlagBits::eColor)
+            .setBaseMipLevel(0)
+            .setLevelCount(1)
+            .setBaseArrayLayer(0)
+            .setLayerCount(1)));
 }

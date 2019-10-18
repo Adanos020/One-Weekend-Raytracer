@@ -37,6 +37,8 @@ private:
 
 private:
     vk::UniqueShaderModule load_shader_module(const std::string_view code_path, const struct render_plan&) const;
+    void transfer_image(vk::Image&, const vk::ImageLayout old_layout, const vk::ImageLayout new_layout,
+        const vk::PipelineStageFlagBits src_stage, const vk::PipelineStageFlagBits dst_stage);
 
 private:
     const uint32_t sample_count;
