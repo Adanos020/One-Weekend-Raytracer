@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NDEBUG
+#   define VK_ENABLE_VALIDATION_LAYERS
+#endif
+
 #include <camera.hpp>
 #include <util/colors.hpp>
 #include <util/sizes.hpp>
@@ -36,16 +40,21 @@ private:
 
 private:
     const uint32_t sample_count;
+
+#ifdef VK_ENABLE_VALIDATION_LAYERS
     const std::vector<const char*> validation_layers = {
         "VK_LAYER_KHRONOS_validation",
     };
     const std::vector<const char*> extensions = {
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     };
+#endif
 
     vk::UniqueInstance vulkan_instance;
+#ifdef VK_ENABLE_VALIDATION_LAYERS
     vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic> debug_messenger;
     vk::DispatchLoaderDynamic dispatch;
+#endif
 
     vk::PhysicalDevice physical_device;
     uint32_t compute_queue_index;

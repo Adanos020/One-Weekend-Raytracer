@@ -20,9 +20,16 @@ std::vector<uint8_t> scene::to_bytes() const
     const size_t noise_textures_size = sizeof(noise_texture) * this->noise_textures.size();
 
     std::vector<uint8_t> bytes(sky_size
-        + shapes_size + sphere_shapes_size
-        + dielectric_materials_size + diffuse_light_materials_size + lambertian_materials_size + metal_materials_size
-        + checker_textures_size + constant_textures_size + image_textures_size + noise_textures_size);
+        + shapes_size
+        + sphere_shapes_size
+        + dielectric_materials_size
+        + diffuse_light_materials_size
+        + lambertian_materials_size
+        + metal_materials_size
+        + checker_textures_size
+        + constant_textures_size
+        + image_textures_size
+        + noise_textures_size, 0);
 
     size_t current_position = 0;
     const auto append_data = [&](auto* source, const size_t size)

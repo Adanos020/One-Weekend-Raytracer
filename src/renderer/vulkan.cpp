@@ -16,6 +16,7 @@ using namespace std::string_literals;
 
 // Helpers
 
+#ifdef VK_ENABLE_VALIDATION_LAYERS
 inline static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
@@ -36,6 +37,7 @@ inline static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     }
     return VK_FALSE;
 }
+#endif
 
 std::optional<uint32_t> find_compute_queue_family(const vk::PhysicalDevice& device)
 {
@@ -220,17 +222,17 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
         transition_layout.command_buffer.pipelineBarrier(
             vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
             vk::DependencyFlags{}, {}, {}, vk::ImageMemoryBarrier{}
-            .setOldLayout(vk::ImageLayout::eGeneral)
-            .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setImage(output_image)
-            .setSubresourceRange(vk::ImageSubresourceRange{}
-                .setAspectMask(vk::ImageAspectFlagBits::eColor)
-                .setBaseMipLevel(0)
-                .setLevelCount(1)
-                .setBaseArrayLayer(0)
-                .setLayerCount(1)));
+                .setOldLayout(vk::ImageLayout::eGeneral)
+                .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(output_image)
+                .setSubresourceRange(vk::ImageSubresourceRange{}
+                    .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                    .setBaseMipLevel(0)
+                    .setLevelCount(1)
+                    .setBaseArrayLayer(0)
+                    .setLayerCount(1)));
     }
 
     // Retrieve image
@@ -281,21 +283,26 @@ void vulkan_renderer::create_instance()
 
     const auto application_info = vk::ApplicationInfo{}
         .setApiVersion(VK_MAKE_VERSION(1, 1, 0));
+#ifdef VK_ENABLE_VALIDATION_LAYERS
     const auto debug_messenger_info = vk::DebugUtilsMessengerCreateInfoEXT{}
         .setMessageSeverity(MsgSeverity::eVerbose | MsgSeverity::eWarning | MsgSeverity::eError)
         .setMessageType(MsgType::eGeneral | MsgType::eValidation | MsgType::ePerformance)
         .setPfnUserCallback(debug_callback);
-
+#endif
     this->vulkan_instance = vk::createInstanceUnique(vk::InstanceCreateInfo{}
-        .setPApplicationInfo(&application_info)
+#ifdef VK_ENABLE_VALIDATION_LAYERS
         .setPNext(&debug_messenger_info)
         .setPpEnabledLayerNames(this->validation_layers.data())
         .setEnabledLayerCount(this->validation_layers.size())
         .setEnabledExtensionCount(this->extensions.size())
-        .setPpEnabledExtensionNames(this->extensions.data()));
+        .setPpEnabledExtensionNames(this->extensions.data())
+#endif
+        .setPApplicationInfo(&application_info));
+#ifdef VK_ENABLE_VALIDATION_LAYERS
     this->dispatch.init(*this->vulkan_instance);
     this->debug_messenger = this->vulkan_instance->createDebugUtilsMessengerEXTUnique(
         debug_messenger_info, nullptr, this->dispatch);
+#endif
 
     std::cout << "Done." << std::endl;
 }
@@ -327,8 +334,10 @@ void vulkan_renderer::setup_devices()
         .setPQueuePriorities(&queue_priority);
 
     this->device = this->physical_device.createDeviceUnique(vk::DeviceCreateInfo{}
+#ifdef VK_ENABLE_VALIDATION_LAYERS
         .setEnabledLayerCount(this->validation_layers.size())
         .setPpEnabledLayerNames(this->validation_layers.data())
+#endif
         .setQueueCreateInfoCount(1)
         .setPQueueCreateInfos(&compute_queue_info));
 
