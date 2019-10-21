@@ -98,6 +98,15 @@ UV uvOnSphere(in const Position normalizedP);
 
 RGBA toRGBA8(in const Color color);
 
+// Ray
+
+struct Ray
+{
+	Line line;
+};
+
+Color seenColor(Ray, const uint depth);
+
 // Textures
 
 #define TextureTypeID uint
@@ -198,14 +207,39 @@ struct SphereShape
 	Sphere shapeData;
 };
 
-// Ray
+// Hit detection
 
-struct Ray
+struct HitRecord
 {
-	Line line;
+	bool occurred;
+	float t;
+	Position point;
+	Displacement normal;
+	Material material;
+	UV uv;
 };
 
-Color seenColor(in const Ray, in const int depth);
+const HitRecord noHit = { false, infinity, Position(0), Displacement(0), Material(0, 0), UV(0, 0) };
+
+HitRecord rayHitsAnything(in const Ray ray, in const MinMax t);
+HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t);
+
+// Scattering
+
+struct Scattering
+{
+	bool occurred;
+	Color attenuation;
+	Ray scatteredRay;
+};
+
+const Scattering noScattering = { false, Color(0), Ray(Line(Position(0), Direction(0))) };
+
+Scattering scatter(in const Material, in const Ray, in const HitRecord);
+Scattering scatter(in const DielectricMaterial, in const Ray, in const HitRecord);
+Scattering scatter(in const DiffuseLightMaterial, in const Ray, in const HitRecord);
+Scattering scatter(in const LambertianMaterial, in const Ray, in const HitRecord);
+Scattering scatter(in const MetalMaterial, in const Ray, in const HitRecord);
 
 // Camera
 
@@ -222,28 +256,7 @@ struct Camera
 	MinMax time;
 };
 
-Ray shootRayAt(in const UV);
-
-// Hit detection
-
-struct Hit
-{
-	float t;
-	Position point;
-	Displacement normal;
-	Material material;
-	UV uv;
-};
-
-struct HitRecord
-{
-	bool occurred;
-	Hit record;
-};
-
-const HitRecord noHit = HitRecord(false, Hit(0, Position(0), Displacement(0), Material(0, 0), UV(0, 0)));
-
-HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t);
+Ray shootRayAt(in const Camera, in const UV);
 
 // I/O
 
@@ -261,6 +274,7 @@ layout(binding = 0) readonly uniform Scene
 #if SCENE_SHAPES_COUNT
 	Shape shapes[SCENE_SHAPES_COUNT];
 #endif
+
 #if SCENE_SPHERE_SHAPES_COUNT
 	SphereShape sphereShapes[SCENE_SPHERE_SHAPES_COUNT];
 #endif
@@ -268,12 +282,15 @@ layout(binding = 0) readonly uniform Scene
 #if SCENE_DIELECTRIC_MATERIALS_COUNT
 	DielectricMaterial dielectricMaterials[SCENE_DIELECTRIC_MATERIALS_COUNT];
 #endif
+
 #if SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT
 	DiffuseLightMaterial diffuseLightMaterials[SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT];
 #endif
+
 #if SCENE_LAMBERTIAN_MATERIALS_COUNT
 	LambertianMaterial lambertianMaterials[SCENE_LAMBERTIAN_MATERIALS_COUNT];
 #endif
+
 #if SCENE_METAL_MATERIALS_COUNT
 	MetalMaterial metalMaterials[SCENE_METAL_MATERIALS_COUNT];
 #endif
@@ -281,12 +298,15 @@ layout(binding = 0) readonly uniform Scene
 #if SCENE_CHECKER_TEXTURES_COUNT
 	CheckerTexture checkerTextures[SCENE_CHECKER_TEXTURES_COUNT];
 #endif
+
 #if SCENE_CONSTANT_TEXTURES_COUNT
 	ConstantTexture constantTextures[SCENE_CONSTANT_TEXTURES_COUNT];
 #endif
+
 #if SCENE_IMAGE_TEXTURES_COUNT
 	ImageTexture imageTextures[SCENE_IMAGE_TEXTURES_COUNT];
 #endif
+
 #if SCENE_NOISE_TEXTURES_COUNT
 	NoiseTexture noiseTextures[SCENE_NOISE_TEXTURES_COUNT];
 #endif
@@ -303,14 +323,14 @@ void main()
 	const float inverseImageWidth = 1.f / float(renderInfo.imageExtent.width);
 	const float inverseImageHeight = 1.f / float(renderInfo.imageExtent.height);
 
-	vec3 color;
+	Color color;
 	for (uint i = 0; i < renderInfo.sampleCount; ++i)
 	{
 		const UV uv = {
 			float(gl_GlobalInvocationID.x + randomUniform()) * inverseImageWidth,
 			float(renderInfo.imageExtent.height - gl_GlobalInvocationID.y + randomUniform()) * inverseImageHeight,
 		};
-		const Ray ray = shootRayAt(uv);
+		const Ray ray = shootRayAt(renderInfo.camera, uv);
 		color += seenColor(ray, 0);
 	}
 	color /= float(renderInfo.sampleCount);
@@ -320,41 +340,63 @@ void main()
 
 // Ray
 
-Ray shootRayAt(in const UV uv)
+Ray shootRayAt(in const Camera camera, in const UV uv)
 {
-	const Camera camera = renderInfo.camera;
 	const Displacement randomSpotOnLens = camera.lensRadius * randomInUnitDisk();
 	const Displacement offset = (camera.u * randomSpotOnLens.x) + (camera.v * randomSpotOnLens.y);
 	const Position origin = camera.origin + offset;
 	return Ray(Line(origin, camera.lowerLeftCorner + (uv.v * camera.horizontal) + (uv.u * camera.vertical) - origin));
 }
 
-Color seenColor(in const Ray ray, in const int depth)
+Color seenColor(Ray ray, const uint depth)
 {
-#if SCENE_SHAPES_COUNT
-	for (uint i = 0; i < SCENE_SHAPES_COUNT; ++i)
+	Color color = mix(Color(1.f), Color(0.5f, 0.7f, 1.f), (0.5f * normalize(ray.line.direction).y) + 0.5f);
+	for (uint d = 0; d < depth; ++d)
 	{
-		HitRecord hit = noHit;
-		switch (scene.shapes[i].type)
-		{
-#	if SCENE_SPHERE_SHAPES_COUNT
-		case SHAPE_TYPE_SPHERE:
-			hit = rayHits(ray, scene.sphereShapes[scene.shapes[i].index], MinMax(0, infinity));
-			break;
-#	endif
-		}
-
+		const HitRecord hit = rayHitsAnything(ray, MinMax(0.0001f, infinity));
 		if (hit.occurred)
 		{
-			hit.record.material = scene.shapes[i].material;
+			const Scattering scattering = scatter(hit.material, ray, hit);
+			if (scattering.occurred)
+			{
+				color *= scattering.attenuation;
+				ray = scattering.scatteredRay;
+			}
+			continue;
 		}
+		break;
 	}
-#endif
-	const float t = (0.5f * normalize(ray.line.direction).y) + 0.5f;
-	return mix(Color(1.f), Color(0.5f, 0.7f, 1.f), t);
+	return color;
 }
 
 // Shapes
+
+HitRecord rayHitsAnything(in const Ray ray, in const MinMax t)
+{
+	HitRecord closestHit = noHit;
+	closestHit.t = t.hi;
+#if SCENE_SHAPES_COUNT
+	for (uint i = 0; i < SCENE_SHAPES_COUNT; ++i)
+	{
+		switch (scene.shapes[i].type)
+		{
+#	if SCENE_SPHERE_SHAPES_COUNT
+			case SHAPE_TYPE_SPHERE:
+			{
+				const HitRecord hit = rayHits(ray, scene.sphereShapes[scene.shapes[i].index], MinMax(t.lo, closestHit.t));
+				if (hit.occurred)
+				{
+					closestHit = hit;
+					closestHit.material = scene.shapes[i].material;
+				}
+				break;
+			}
+#	endif
+		}
+	}
+#endif
+	return closestHit;
+}
 
 HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t)
 {
@@ -372,15 +414,62 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 		{
 			root = (-b + sqrt(discriminant)) / a;
 		}
-		if (root < t.hi && root > t.lo)
+		if (root <= t.hi && root >= t.lo)
 		{
 			const Position point = pointOnLine(ray.line, root);
-			const UV uv = uvOnSphere(abs(1 / shapeData.radius) * (point - shapeData.origin));
-			const Direction normal = (point - shapeData.origin) / shapeData.radius;
-			return HitRecord(true, Hit(root, point, normal, Material(0, 0), uv));
+			const Direction normal = (point - shapeData.origin) / abs(shapeData.radius);
+			const UV uv = uvOnSphere(normal);
+			return HitRecord(true, root, point, normal, Material(0, 0), uv);
 		}
 	}
 	return noHit;
+}
+
+// Materials
+
+Scattering scatter(in const Material material, in const Ray ray, in const HitRecord hit)
+{
+	switch (material.type)
+	{
+#if SCENE_DIELECTRIC_MATERIALS_COUNT
+		case MATERIAL_TYPE_DIELECTRIC: return scatter(scene.dielectricMaterials[material.index], ray, hit);
+#endif
+
+#if SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT
+		case MATERIAL_TYPE_DIFFUSE_LIGHT: return scatter(scene.diffuseLightMaterials[material.index], ray, hit);
+#endif
+
+#if SCENE_LAMBERTIAN_MATERIALS_COUNT
+		case MATERIAL_TYPE_LAMBERTIAN: return scatter(scene.lambertianMaterials[material.index], ray, hit);
+#endif
+
+#if SCENE_METAL_MATERIALS_COUNT
+		case MATERIAL_TYPE_METAL: return scatter(scene.metalMaterials[material.index], ray, hit);
+#endif
+	}
+	return noScattering;
+}
+
+Scattering scatter(in const DielectricMaterial material, in const Ray ray, in const HitRecord hit)
+{
+	return noScattering;
+}
+
+Scattering scatter(in const DiffuseLightMaterial material, in const Ray ray, in const HitRecord hit)
+{
+	return noScattering;
+}
+
+Scattering scatter(in const LambertianMaterial material, in const Ray ray, in const HitRecord hit)
+{
+	const Position target = hit.point + hit.normal + randomDirection();
+	return Scattering(true, colorAtTexture(material.albedo, hit.uv, hit.point),
+		Ray(Line(hit.point, target - hit.point)));
+}
+
+Scattering scatter(in const MetalMaterial material, in const Ray ray, in const HitRecord hit)
+{
+	return noScattering;
 }
 
 // Textures
@@ -392,12 +481,15 @@ Color colorAtTexture(in const Texture tex, in const UV uv, in const Position pos
 #if SCENE_CHECKER_TEXTURES_COUNT
 		case TEXTURE_TYPE_CHECKER: return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
 #endif
+
 #if SCENE_CONSTANT_TEXTURES_COUNT
 		case TEXTURE_TYPE_CONSTANT: return colorAtTexture(scene.constantTextures[tex.index], uv, position);
 #endif
+
 #if SCENE_IMAGE_TEXTURES_COUNT
 		case TEXTURE_TYPE_IMAGE: return colorAtTexture(scene.imageTextures[tex.index], uv, position);
 #endif
+
 #if SCENE_NOISE_TEXTURES_COUNT
 		case TEXTURE_TYPE_NOISE: return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
 #endif

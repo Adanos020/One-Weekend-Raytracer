@@ -140,7 +140,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
                 .setSharingMode(vk::SharingMode::eExclusive),
             vma::AllocationCreateInfo{}
                 .setUsage(vma::MemoryUsage::eCpuOnly));
-        this->copy_from_memory(staging_allocation, plan.world.to_bytes().data(), scene_buffer_size);
+        this->copy_to_memory(staging_allocation, plan.world.to_bytes().data(), scene_buffer_size);
         this->copy_buffer(staging_buffer, scene_buffer, scene_buffer_size);
         this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
     }
@@ -246,7 +246,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
                 .setImageOffset(vk::Offset3D{ 0, 0, 0 })
                 .setImageExtent(image_extent));
     }
-    this->copy_to_memory(staging_allocation, image.data(), output_image_size);
+    this->copy_from_memory(staging_allocation, image.data(), output_image_size);
     this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
     
     std::cout << "Done." << std::endl;
@@ -455,35 +455,37 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
     string_replace_all(code, "@SCENE_IMAGE_TEXTURES_COUNT@", std::to_string(plan.world.image_textures.size()));
     string_replace_all(code, "@SCENE_NOISE_TEXTURES_COUNT@", std::to_string(plan.world.noise_textures.size()));
 
-    std::cout << std::endl << "Compiling shader... ";
+    std::cout << "Compiling shader... ";
 
     shaderc::Compiler compiler;
     const shaderc::SpvCompilationResult compilation_result = compiler.CompileGlslToSpv(
         code, shaderc_shader_kind::shaderc_compute_shader, code_path.data());
     if (compilation_result.GetCompilationStatus() != shaderc_compilation_status_success)
     {
+        std::cout << "Error." << std::endl;
         throw std::runtime_error(std::string(compilation_result.GetErrorMessage()));
     }
     std::vector<uint32_t> spv(compilation_result.cbegin(), compilation_result.cend());
 
     std::cout << "Done." << std::endl;
+    std::cout << "Creating shader module... ";
 
     return this->device->createShaderModuleUnique(vk::ShaderModuleCreateInfo{}
         .setCodeSize(spv.size() * sizeof(uint32_t))
         .setPCode(spv.data()));
 }
 
-void vulkan_renderer::copy_from_memory(const vma::Allocation& allocation, const void* memory, const size_t size) const
+void vulkan_renderer::copy_to_memory(const vma::Allocation& allocation, const void* data, const size_t size) const
 {
-    void* data = this->memory_allocator.mapMemory(allocation);
-    std::memcpy(data, memory, size);
+    void* memory = this->memory_allocator.mapMemory(allocation);
+    std::memcpy(memory, data, size);
     this->memory_allocator.unmapMemory(allocation);
 }
 
-void vulkan_renderer::copy_to_memory(const vma::Allocation& allocation, void* memory, const size_t size) const
+void vulkan_renderer::copy_from_memory(const vma::Allocation& allocation, void* data, const size_t size) const
 {
-    void* data = this->memory_allocator.mapMemory(allocation);
-    std::memcpy(memory, data, size);
+    void* memory = this->memory_allocator.mapMemory(allocation);
+    std::memcpy(data, memory, size);
     this->memory_allocator.unmapMemory(allocation);
 }
 

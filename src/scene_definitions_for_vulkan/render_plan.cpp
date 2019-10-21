@@ -4,7 +4,7 @@
 render_plan render_plan::hello_ball(const extent_2d<uint32_t>& image_size)
 {
     const camera cam = camera_create_info{
-        position{ 13.f, 2.f, 3.f },
+        position{ 3.f, 3.f, 2.f },
         position{ 0.f, 0.f, 0.f },
         y_axis,
         20.f,
