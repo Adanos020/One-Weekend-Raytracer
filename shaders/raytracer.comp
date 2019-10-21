@@ -24,6 +24,7 @@ const float pi = 3.14159265358979323846264338327950288;
 const float halfPi = 1.57079632679489661923132169163975144;
 const float oneOverPi = 0.318309886183790671537767526745028724;
 const float oneOverTwoPi = 0.159154943091895335768883763372514362;
+const float infinity = 1.f / 0.f;
 
 // Sizes
 
@@ -115,8 +116,8 @@ struct Texture
 struct CheckerTexture
 {
 	float scale;
-	Texture odd;
-	Texture even;
+	Color odd;
+	Color even;
 };
 
 struct ConstantTexture
@@ -204,7 +205,7 @@ struct Ray
 	Line line;
 };
 
-Color seenColor(in const Ray ray);
+Color seenColor(in const Ray, in const int depth);
 
 // Camera
 
@@ -240,6 +241,8 @@ struct HitRecord
 	Hit record;
 };
 
+const HitRecord noHit = HitRecord(false, Hit(0, Position(0), Displacement(0), Material(0, 0), UV(0, 0)));
+
 HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax t);
 
 // I/O
@@ -255,18 +258,38 @@ layout(binding = 0) readonly uniform Scene
 {
 	Texture sky;
 
+#if SCENE_SHAPES_COUNT
 	Shape shapes[SCENE_SHAPES_COUNT];
+#endif
+#if SCENE_SPHERE_SHAPES_COUNT
 	SphereShape sphereShapes[SCENE_SPHERE_SHAPES_COUNT];
+#endif
 
+#if SCENE_DIELECTRIC_MATERIALS_COUNT
 	DielectricMaterial dielectricMaterials[SCENE_DIELECTRIC_MATERIALS_COUNT];
+#endif
+#if SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT
 	DiffuseLightMaterial diffuseLightMaterials[SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT];
+#endif
+#if SCENE_LAMBERTIAN_MATERIALS_COUNT
 	LambertianMaterial lambertianMaterials[SCENE_LAMBERTIAN_MATERIALS_COUNT];
+#endif
+#if SCENE_METAL_MATERIALS_COUNT
 	MetalMaterial metalMaterials[SCENE_METAL_MATERIALS_COUNT];
+#endif
 
+#if SCENE_CHECKER_TEXTURES_COUNT
 	CheckerTexture checkerTextures[SCENE_CHECKER_TEXTURES_COUNT];
+#endif
+#if SCENE_CONSTANT_TEXTURES_COUNT
 	ConstantTexture constantTextures[SCENE_CONSTANT_TEXTURES_COUNT];
+#endif
+#if SCENE_IMAGE_TEXTURES_COUNT
 	ImageTexture imageTextures[SCENE_IMAGE_TEXTURES_COUNT];
+#endif
+#if SCENE_NOISE_TEXTURES_COUNT
 	NoiseTexture noiseTextures[SCENE_NOISE_TEXTURES_COUNT];
+#endif
 } scene;
 
 layout(binding = 1) uniform sampler2D textures[];
@@ -288,7 +311,7 @@ void main()
 			float(renderInfo.imageExtent.height - gl_GlobalInvocationID.y + randomUniform()) * inverseImageHeight,
 		};
 		const Ray ray = shootRayAt(uv);
-		color += seenColor(ray);
+		color += seenColor(ray, 0);
 	}
 	color /= float(renderInfo.sampleCount);
 
@@ -306,8 +329,27 @@ Ray shootRayAt(in const UV uv)
 	return Ray(Line(origin, camera.lowerLeftCorner + (uv.v * camera.horizontal) + (uv.u * camera.vertical) - origin));
 }
 
-Color seenColor(in const Ray ray)
+Color seenColor(in const Ray ray, in const int depth)
 {
+#if SCENE_SHAPES_COUNT
+	for (uint i = 0; i < SCENE_SHAPES_COUNT; ++i)
+	{
+		HitRecord hit = noHit;
+		switch (scene.shapes[i].type)
+		{
+#	if SCENE_SPHERE_SHAPES_COUNT
+		case SHAPE_TYPE_SPHERE:
+			hit = rayHits(ray, scene.sphereShapes[scene.shapes[i].index], MinMax(0, infinity));
+			break;
+#	endif
+		}
+
+		if (hit.occurred)
+		{
+			hit.record.material = scene.shapes[i].material;
+		}
+	}
+#endif
 	const float t = (0.5f * normalize(ray.line.direction).y) + 0.5f;
 	return mix(Color(1.f), Color(0.5f, 0.7f, 1.f), t);
 }
@@ -338,25 +380,38 @@ HitRecord rayHits(in const Ray ray, in const SphereShape sphere, in const MinMax
 			return HitRecord(true, Hit(root, point, normal, Material(0, 0), uv));
 		}
 	}
-	return HitRecord(false, Hit(0, Position(0), Displacement(0), Material(0, 0), UV(0, 0)));
+	return noHit;
 }
 
 // Textures
 
 Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position)
 {
-//	switch (tex.type)
-//	{
-//	case TEXTURE_TYPE_CHECKER:
-//		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
-//	case TEXTURE_TYPE_CONSTANT:
-//		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
-//	case TEXTURE_TYPE_IMAGE:
-//		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
-//	case TEXTURE_TYPE_NOISE:
-//		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
-//	}
+	switch (tex.type)
+	{
+#if SCENE_CHECKER_TEXTURES_COUNT
+		case TEXTURE_TYPE_CHECKER: return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
+#endif
+#if SCENE_CONSTANT_TEXTURES_COUNT
+		case TEXTURE_TYPE_CONSTANT: return colorAtTexture(scene.constantTextures[tex.index], uv, position);
+#endif
+#if SCENE_IMAGE_TEXTURES_COUNT
+		case TEXTURE_TYPE_IMAGE: return colorAtTexture(scene.imageTextures[tex.index], uv, position);
+#endif
+#if SCENE_NOISE_TEXTURES_COUNT
+		case TEXTURE_TYPE_NOISE: return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
+#endif
+	}
 	return Color(1.f);
+}
+
+Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Position position)
+{
+	if (sin(tex.scale * position.x) * sin(tex.scale * position.y) * sin(tex.scale * position.z) < 0)
+	{
+		return tex.odd;
+	}
+	return tex.even;
 }
 
 Color colorAtTexture(in const ConstantTexture tex, in const UV uv, in const Position position)
@@ -374,20 +429,11 @@ Color colorAtTexture(in const NoiseTexture tex, in const UV uv, in const Positio
 	return Color(1.f);
 }
 
-Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Position position)
-{
-	if (sin(tex.scale * position.x) * sin(tex.scale * position.y) * sin(tex.scale * position.z) < 0)
-	{
-		return colorAtTexture(tex.odd, uv, position);
-	}
-	return colorAtTexture(tex.even, uv, position);
-}
-
 // Colors
 
 RGBA toRGBA8(in const Color color)
 {
-	return uvec4(color * 255, 255);
+	return uvec4(color.rgb * 255, 255);
 }
 
 // Geometric

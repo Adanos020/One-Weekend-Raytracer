@@ -1,5 +1,5 @@
 #include <renderer/vulkan.hpp>
-#include <render_plan.hpp>
+#include <scene_definitions_for_vulkan/render_plan.hpp>
 #include <util/string.hpp>
 #include <util/vk_single_time_commands.hpp>
 
@@ -75,7 +75,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     const vk::Extent3D image_extent = { plan.image_size.width, plan.image_size.height, 1 };
     std::vector<rgba> image{ image_extent.width * image_extent.height, rgba{ 1 } };
 
-    const vk::DeviceSize scene_buffer_size = 1;
+    const vk::DeviceSize scene_buffer_size = plan.world.size();
     const vk::DeviceSize texture_images_buffer_size = 1;
 
     std::cout << "Allocating memory for scene... ";
@@ -128,6 +128,22 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     this->transfer_image(output_image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
         vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader);
+
+    std::cout << "Done." << std::endl;
+    std::cout << "Copying input data... ";
+
+    { // scene
+        auto [staging_buffer, staging_allocation] = this->memory_allocator.createBuffer(
+            vk::BufferCreateInfo{}
+                .setSize(scene_buffer_size)
+                .setUsage(vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferSrc)
+                .setSharingMode(vk::SharingMode::eExclusive),
+            vma::AllocationCreateInfo{}
+                .setUsage(vma::MemoryUsage::eCpuOnly));
+        this->copy_from_memory(staging_allocation, plan.world.to_bytes().data(), scene_buffer_size);
+        this->copy_buffer(staging_buffer, scene_buffer, scene_buffer_size);
+        this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
+    }
 
     std::cout << "Done." << std::endl;
     std::cout << "Updating descriptor sets... ";
@@ -230,9 +246,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
                 .setImageOffset(vk::Offset3D{ 0, 0, 0 })
                 .setImageExtent(image_extent));
     }
-    void* output_data = this->memory_allocator.mapMemory(staging_allocation);
-    std::memcpy(image.data(), output_data, output_image_size);
-    this->memory_allocator.unmapMemory(staging_allocation);
+    this->copy_to_memory(staging_allocation, image.data(), output_image_size);
     this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
     
     std::cout << "Done." << std::endl;
@@ -318,7 +332,7 @@ void vulkan_renderer::setup_devices()
         .setPhysicalDevice(this->physical_device)
         .setDevice(*this->device));
 
-    std::cout << "Done." << std::endl;
+    std::cout << "Done, picked: " << this->physical_device.getProperties().deviceName << std::endl;
 }
 
 void vulkan_renderer::setup_pipeline(const render_plan& plan)
@@ -430,16 +444,16 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
     code.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
     file.close();
 
-    string_replace_all(code, "@SCENE_SHAPES_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_SPHERE_SHAPES_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_DIELECTRIC_MATERIALS_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_LAMBERTIAN_MATERIALS_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_METAL_MATERIALS_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_CHECKER_TEXTURES_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_CONSTANT_TEXTURES_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_IMAGE_TEXTURES_COUNT@", std::to_string(1));
-    string_replace_all(code, "@SCENE_NOISE_TEXTURES_COUNT@", std::to_string(1));
+    string_replace_all(code, "@SCENE_SHAPES_COUNT@", std::to_string(plan.world.shapes.size()));
+    string_replace_all(code, "@SCENE_SPHERE_SHAPES_COUNT@", std::to_string(plan.world.sphere_shapes.size()));
+    string_replace_all(code, "@SCENE_DIELECTRIC_MATERIALS_COUNT@", std::to_string(plan.world.dielectric_materials.size()));
+    string_replace_all(code, "@SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT@", std::to_string(plan.world.diffuse_light_materials.size()));
+    string_replace_all(code, "@SCENE_LAMBERTIAN_MATERIALS_COUNT@", std::to_string(plan.world.lambertian_materials.size()));
+    string_replace_all(code, "@SCENE_METAL_MATERIALS_COUNT@", std::to_string(plan.world.metal_materials.size()));
+    string_replace_all(code, "@SCENE_CHECKER_TEXTURES_COUNT@", std::to_string(plan.world.checker_textures.size()));
+    string_replace_all(code, "@SCENE_CONSTANT_TEXTURES_COUNT@", std::to_string(plan.world.constant_textures.size()));
+    string_replace_all(code, "@SCENE_IMAGE_TEXTURES_COUNT@", std::to_string(plan.world.image_textures.size()));
+    string_replace_all(code, "@SCENE_NOISE_TEXTURES_COUNT@", std::to_string(plan.world.noise_textures.size()));
 
     std::cout << std::endl << "Compiling shader... ";
 
@@ -448,7 +462,7 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
         code, shaderc_shader_kind::shaderc_compute_shader, code_path.data());
     if (compilation_result.GetCompilationStatus() != shaderc_compilation_status_success)
     {
-        throw std::runtime_error(compilation_result.GetErrorMessage());
+        throw std::runtime_error(std::string(compilation_result.GetErrorMessage()));
     }
     std::vector<uint32_t> spv(compilation_result.cbegin(), compilation_result.cend());
 
@@ -457,6 +471,26 @@ vk::UniqueShaderModule vulkan_renderer::load_shader_module(const std::string_vie
     return this->device->createShaderModuleUnique(vk::ShaderModuleCreateInfo{}
         .setCodeSize(spv.size() * sizeof(uint32_t))
         .setPCode(spv.data()));
+}
+
+void vulkan_renderer::copy_from_memory(const vma::Allocation& allocation, const void* memory, const size_t size) const
+{
+    void* data = this->memory_allocator.mapMemory(allocation);
+    std::memcpy(data, memory, size);
+    this->memory_allocator.unmapMemory(allocation);
+}
+
+void vulkan_renderer::copy_to_memory(const vma::Allocation& allocation, void* memory, const size_t size) const
+{
+    void* data = this->memory_allocator.mapMemory(allocation);
+    std::memcpy(memory, data, size);
+    this->memory_allocator.unmapMemory(allocation);
+}
+
+void vulkan_renderer::copy_buffer(const vk::Buffer& source, vk::Buffer& destination, const vk::DeviceSize size)
+{
+    vk_single_time_commands retrieve_image{ *this->device, this->compute_queue, *this->command_pool };
+    retrieve_image.command_buffer.copyBuffer(source, destination, vk::BufferCopy{}.setSize(size));
 }
 
 void vulkan_renderer::transfer_image(vk::Image& image, const vk::ImageLayout old_layout,

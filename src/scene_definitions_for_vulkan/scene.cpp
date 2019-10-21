@@ -52,9 +52,39 @@ std::vector<uint8_t> scene::to_bytes() const
     return bytes;
 }
 
-shape scene::add_shape(const sphere_shape& in_shape)
+size_t scene::size() const
 {
-    this->shapes.push_back(shape{ shape_type::sphere, this->sphere_shapes.size() });
+    const size_t sky_size = sizeof(texture);
+
+    const size_t shapes_size = sizeof(shape) * this->shapes.size();
+    const size_t sphere_shapes_size = sizeof(sphere_shape) * this->sphere_shapes.size();
+
+    const size_t dielectric_materials_size = sizeof(dielectric_material) * this->dielectric_materials.size();
+    const size_t diffuse_light_materials_size = sizeof(diffuse_light_material) * this->diffuse_light_materials.size();
+    const size_t lambertian_materials_size = sizeof(lambertian_material) * this->lambertian_materials.size();
+    const size_t metal_materials_size = sizeof(metal_material) * this->metal_materials.size();
+
+    const size_t checker_textures_size = sizeof(checker_texture) * this->checker_textures.size();
+    const size_t constant_textures_size = sizeof(constant_texture) * this->constant_textures.size();
+    const size_t image_textures_size = sizeof(image_texture) * this->image_textures.size();
+    const size_t noise_textures_size = sizeof(noise_texture) * this->noise_textures.size();
+
+    return sky_size
+        + shapes_size
+        + sphere_shapes_size
+        + dielectric_materials_size
+        + diffuse_light_materials_size
+        + lambertian_materials_size
+        + metal_materials_size
+        + checker_textures_size
+        + constant_textures_size
+        + image_textures_size
+        + noise_textures_size;
+}
+
+shape scene::add_shape(const sphere_shape& in_shape, const material& mat)
+{
+    this->shapes.push_back(shape{ shape_type::sphere, this->sphere_shapes.size(), mat });
     this->sphere_shapes.push_back(in_shape);
     return this->shapes.back();
 }

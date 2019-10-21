@@ -12,8 +12,7 @@ file(GLOB_RECURSE SOURCES
 
 add_executable(One-Weekend-Raytracer ${SOURCES})
 
-
-if(UNIX)
+if (UNIX)
 	set(THREADS_PREFER_PTHREAD_FLAG ON)
 	find_package(Threads REQUIRED)
 	find_package(Vulkan REQUIRED)
@@ -21,7 +20,7 @@ if(UNIX)
 		Threads::Threads
 		Vulkan::Vulkan
 		shaderc_shared)
-elseif(WIN32)
+elseif (WIN32)
 	find_package(glm CONFIG REQUIRED)
 	find_package(Vulkan REQUIRED)
 	find_library(SHADERC shaderc_combined)

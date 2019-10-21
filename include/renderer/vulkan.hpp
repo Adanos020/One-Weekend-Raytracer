@@ -37,6 +37,12 @@ private:
 
 private:
     vk::UniqueShaderModule load_shader_module(const std::string_view code_path, const struct render_plan&) const;
+    
+    void copy_from_memory(const vma::Allocation&, const void* memory, const size_t size) const;
+    void copy_to_memory(const vma::Allocation&, void* memory, const size_t size) const;
+
+    void copy_buffer(const vk::Buffer& source, vk::Buffer& destination, const vk::DeviceSize size);
+    
     void transfer_image(vk::Image&, const vk::ImageLayout old_layout, const vk::ImageLayout new_layout,
         const vk::PipelineStageFlagBits src_stage, const vk::PipelineStageFlagBits dst_stage);
 

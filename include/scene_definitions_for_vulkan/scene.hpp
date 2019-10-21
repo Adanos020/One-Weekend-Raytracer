@@ -23,7 +23,10 @@ struct scene
     std::vector<image_texture> image_textures;
     std::vector<noise_texture> noise_textures;
 
-    shape add_shape(const sphere_shape&);
+    std::vector<uint8_t> to_bytes() const;
+    size_t size() const;
+
+    shape add_shape(const sphere_shape&, const material&);
 
     material add_material(const dielectric_material&);
     material add_material(const diffuse_light_material&);
@@ -34,6 +37,4 @@ struct scene
     texture add_texture(const constant_texture&);
     texture add_texture(const image_texture&);
     texture add_texture(const noise_texture&);
-
-    std::vector<uint8_t> to_bytes() const;
 };

@@ -27,10 +27,10 @@ struct shape
 {
     shape_type type;
     array_index index;
+    material mat;
 };
 
 struct sphere_shape
 {
     sphere shape_data;
-    material mat;
 };
