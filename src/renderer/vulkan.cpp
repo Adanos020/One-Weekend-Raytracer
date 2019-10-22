@@ -1,3 +1,5 @@
+#define VMA_IMPLEMENTATION
+
 #include <renderer/vulkan.hpp>
 #include <scene_definitions_for_vulkan/render_plan.hpp>
 #include <util/string.hpp>
@@ -63,6 +65,12 @@ vulkan_renderer::vulkan_renderer(const uint32_t sample_count)
 
 vulkan_renderer::~vulkan_renderer()
 {
+    if (unclean)
+    {
+        this->memory_allocator.destroyBuffer(this->scene_memory.first, this->scene_memory.second);
+        this->memory_allocator.destroyBuffer(this->texture_images_memory.first, this->texture_images_memory.second);
+        this->memory_allocator.destroyImage(this->output_image_memory.first, this->output_image_memory.second);
+    }
     this->memory_allocator.destroy();
 }
 
@@ -80,7 +88,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     std::cout << "Allocating memory for scene... ";
 
-    auto [scene_buffer, scene_allocation] = this->memory_allocator.createBuffer(
+    this->scene_memory = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
             .setSize(scene_buffer_size)
             .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
@@ -90,7 +98,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     std::cout << "texture images... ";
 
-    auto [texture_images_buffer, texture_images_allocation] = this->memory_allocator.createBuffer(
+    this->texture_images_memory = this->memory_allocator.createBuffer(
         vk::BufferCreateInfo{}
             .setSize(texture_images_buffer_size)
             .setUsage(vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst)
@@ -100,7 +108,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
 
     std::cout << "output image... ";
 
-    auto [output_image, image_allocation] = this->memory_allocator.createImage(
+    this->output_image_memory = this->memory_allocator.createImage(
         vk::ImageCreateInfo{}
             .setImageType(vk::ImageType::e2D)
             .setExtent(image_extent)
@@ -116,7 +124,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setUsage(vma::MemoryUsage::eGpuOnly));
 
     vk::UniqueImageView output_image_view = this->device->createImageViewUnique(vk::ImageViewCreateInfo{}
-        .setImage(output_image)
+        .setImage(this->output_image_memory.first)
         .setViewType(vk::ImageViewType::e2D)
         .setFormat(vk::Format::eR8G8B8A8Uint)
         .setSubresourceRange(vk::ImageSubresourceRange{}
@@ -126,8 +134,10 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setBaseArrayLayer(0)
             .setLayerCount(1)));
 
-    this->transfer_image(output_image, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+    this->transfer_image(this->output_image_memory.first, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
         vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader);
+
+    this->unclean = true;
 
     std::cout << "Done." << std::endl;
     std::cout << "Copying input data... ";
@@ -141,7 +151,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             vma::AllocationCreateInfo{}
                 .setUsage(vma::MemoryUsage::eCpuOnly));
         this->copy_to_memory(staging_allocation, plan.world.to_bytes().data(), scene_buffer_size);
-        this->copy_buffer(staging_buffer, scene_buffer, scene_buffer_size);
+        this->copy_buffer(staging_buffer, this->scene_memory.first, scene_buffer_size);
         this->memory_allocator.destroyBuffer(staging_buffer, staging_allocation);
     }
 
@@ -149,10 +159,10 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Updating descriptor sets... ";
 
     const auto scene_descriptor_info = vk::DescriptorBufferInfo{}
-        .setBuffer(scene_buffer)
+        .setBuffer(this->scene_memory.first)
         .setRange(VK_WHOLE_SIZE);
     const auto texture_images_descriptor_info = vk::DescriptorBufferInfo{}
-        .setBuffer(texture_images_buffer)
+        .setBuffer(this->texture_images_memory.first)
         .setRange(VK_WHOLE_SIZE);
     const auto image_descriptor_info = vk::DescriptorImageInfo{}
         .setImageLayout(vk::ImageLayout::eGeneral)
@@ -220,7 +230,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Done." << std::endl;
     std::cout << "Retrieving image... ";
 
-    this->transfer_image(output_image, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+    this->transfer_image(this->output_image_memory.first, vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
         vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost);
 
     const vk::DeviceSize output_image_size = image.size() * sizeof(rgba);
@@ -233,7 +243,7 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
             .setUsage(vma::MemoryUsage::eCpuOnly));
     {
         vk_single_time_commands retrieve_image{ *this->device, this->compute_queue, *this->command_pool };
-        retrieve_image.command_buffer.copyImageToBuffer(output_image, vk::ImageLayout::eTransferSrcOptimal,
+        retrieve_image.command_buffer.copyImageToBuffer(this->output_image_memory.first, vk::ImageLayout::eTransferSrcOptimal,
             staging_buffer, vk::BufferImageCopy{}
                 .setBufferOffset(0)
                 .setBufferRowLength(0)
@@ -252,9 +262,11 @@ std::vector<rgba> vulkan_renderer::render_scene(const render_plan& plan)
     std::cout << "Done." << std::endl;
 
     // Cleanup
-    this->memory_allocator.destroyBuffer(scene_buffer, scene_allocation);
-    this->memory_allocator.destroyBuffer(texture_images_buffer, texture_images_allocation);
-    this->memory_allocator.destroyImage(output_image, image_allocation);
+    this->memory_allocator.destroyBuffer(this->scene_memory.first, this->scene_memory.second);
+    this->memory_allocator.destroyBuffer(this->texture_images_memory.first, this->texture_images_memory.second);
+    this->memory_allocator.destroyImage(this->output_image_memory.first, this->output_image_memory.second);
+
+    this->unclean = false;
 
     return image;
 }

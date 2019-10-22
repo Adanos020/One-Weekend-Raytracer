@@ -18,13 +18,13 @@ struct texture
 struct checker_texture
 {
     float scale;
-    texture odd;
-    texture even;
+    color odd;
+    color even;
 };
 
 struct constant_texture
 {
-    color_alpha value;
+    color value;
 };
 
 struct image_texture
@@ -36,5 +36,5 @@ struct image_texture
 struct noise_texture
 {
     float scale;
-    color_alpha base_color;
+    color base_color;
 };

@@ -1,8 +1,12 @@
-#define VMA_IMPLEMENTATION
+#define VULKAN_TEST 1
 
-//#include <renderer/cpu.hpp>
-#include <renderer/vulkan.hpp>
-#include <scene_definitions_for_vulkan/render_plan.hpp>
+#if VULKAN_TEST
+#   include <renderer/vulkan.hpp>
+#   include <scene_definitions_for_vulkan/render_plan.hpp>
+#else
+#   include <render_plan.hpp>
+#   include <renderer/cpu.hpp>
+#endif
 #include <util/string.hpp>
 #include <util/sizes.hpp>
 
@@ -46,12 +50,21 @@ int main()
     try
     {
         const extent_2d<uint32_t> image_size = { 1600, 900 };
+#if VULKAN_TEST
         const render_plan plan = render_plan::hello_ball(image_size);
-
         const std::vector<rgba> image = vulkan_renderer{ 1000 }.render_scene(plan);
+#else
+        const render_plan plan = render_plan::random_balls(image_size);
+        const std::vector<rgba> image = cpu_renderer{ 1000, 20 }.render_scene(plan);
+#endif
         export_image(image, image_size, "test.png");
     }
     catch (const std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+    catch (const vk::Error& e)
     {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;

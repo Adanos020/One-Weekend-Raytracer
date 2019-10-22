@@ -103,6 +103,7 @@ RGBA toRGBA8(in const Color color);
 struct Ray
 {
 	Line line;
+	float time;
 };
 
 Color seenColor(Ray, const uint depth);
@@ -147,8 +148,8 @@ struct NoiseTexture
 };
 
 Color colorAtTexture(in const Texture tex, in const UV uv, in const Position position);
-Color colorAtTexture(in const ConstantTexture tex, in const UV uv, in const Position position);
 Color colorAtTexture(in const CheckerTexture tex, in const UV uv, in const Position position);
+Color colorAtTexture(in const ConstantTexture tex, in const UV uv, in const Position position);
 Color colorAtTexture(in const ImageTexture tex, in const UV uv, in const Position position);
 Color colorAtTexture(in const NoiseTexture tex, in const UV uv, in const Position position);
 
@@ -233,7 +234,7 @@ struct Scattering
 	Ray scatteredRay;
 };
 
-const Scattering noScattering = { false, Color(0), Ray(Line(Position(0), Direction(0))) };
+const Scattering noScattering = { false, Color(0), Ray(Line(Position(0), Direction(0)), 0) };
 
 Scattering scatter(in const Material, in const Ray, in const HitRecord);
 Scattering scatter(in const DielectricMaterial, in const Ray, in const HitRecord);
@@ -328,10 +329,10 @@ void main()
 	{
 		const UV uv = {
 			float(gl_GlobalInvocationID.x + randomUniform()) * inverseImageWidth,
-			float(renderInfo.imageExtent.height - gl_GlobalInvocationID.y + randomUniform()) * inverseImageHeight,
+			(float(renderInfo.imageExtent.height - gl_GlobalInvocationID.y) + randomUniform()) * inverseImageHeight,
 		};
 		const Ray ray = shootRayAt(renderInfo.camera, uv);
-		color += seenColor(ray, 0);
+		color += seenColor(ray, 50);
 	}
 	color /= float(renderInfo.sampleCount);
 
@@ -345,28 +346,31 @@ Ray shootRayAt(in const Camera camera, in const UV uv)
 	const Displacement randomSpotOnLens = camera.lensRadius * randomInUnitDisk();
 	const Displacement offset = (camera.u * randomSpotOnLens.x) + (camera.v * randomSpotOnLens.y);
 	const Position origin = camera.origin + offset;
-	return Ray(Line(origin, camera.lowerLeftCorner + (uv.v * camera.horizontal) + (uv.u * camera.vertical) - origin));
+	return Ray(Line(origin, camera.lowerLeftCorner + (uv.u * camera.horizontal) + (uv.v * camera.vertical) - origin),
+		randomUniform());
 }
 
 Color seenColor(Ray ray, const uint depth)
 {
-	Color color = mix(Color(1.f), Color(0.5f, 0.7f, 1.f), (0.5f * normalize(ray.line.direction).y) + 0.5f);
+	Color color = { 1.f, 1.f, 1.f };
 	for (uint d = 0; d < depth; ++d)
 	{
 		const HitRecord hit = rayHitsAnything(ray, MinMax(0.0001f, infinity));
-		if (hit.occurred)
+		if (!hit.occurred)
 		{
-			const Scattering scattering = scatter(hit.material, ray, hit);
-			if (scattering.occurred)
-			{
-				color *= scattering.attenuation;
-				ray = scattering.scatteredRay;
-			}
-			continue;
+			break;
 		}
-		break;
+
+		const Scattering scattering = scatter(hit.material, ray, hit);
+		if (!scattering.occurred)
+		{
+			break;
+		}
+
+		color *= scattering.attenuation;
+		ray = scattering.scatteredRay;
 	}
-	return color;
+	return color * colorAtTexture(scene.sky, uvOnSphere(normalize(ray.line.direction)), ray.line.origin + ray.line.direction);
 }
 
 // Shapes
@@ -381,16 +385,16 @@ HitRecord rayHitsAnything(in const Ray ray, in const MinMax t)
 		switch (scene.shapes[i].type)
 		{
 #	if SCENE_SPHERE_SHAPES_COUNT
-			case SHAPE_TYPE_SPHERE:
+		case SHAPE_TYPE_SPHERE:
+		{
+			const HitRecord hit = rayHits(ray, scene.sphereShapes[scene.shapes[i].index], MinMax(t.lo, closestHit.t));
+			if (hit.occurred)
 			{
-				const HitRecord hit = rayHits(ray, scene.sphereShapes[scene.shapes[i].index], MinMax(t.lo, closestHit.t));
-				if (hit.occurred)
-				{
-					closestHit = hit;
-					closestHit.material = scene.shapes[i].material;
-				}
-				break;
+				closestHit = hit;
+				closestHit.material = scene.shapes[i].material;
 			}
+			break;
+		}
 #	endif
 		}
 	}
@@ -432,19 +436,23 @@ Scattering scatter(in const Material material, in const Ray ray, in const HitRec
 	switch (material.type)
 	{
 #if SCENE_DIELECTRIC_MATERIALS_COUNT
-		case MATERIAL_TYPE_DIELECTRIC: return scatter(scene.dielectricMaterials[material.index], ray, hit);
+	case MATERIAL_TYPE_DIELECTRIC:
+		return scatter(scene.dielectricMaterials[material.index], ray, hit);
 #endif
 
 #if SCENE_DIFFUSE_LIGHT_MATERIALS_COUNT
-		case MATERIAL_TYPE_DIFFUSE_LIGHT: return scatter(scene.diffuseLightMaterials[material.index], ray, hit);
+	case MATERIAL_TYPE_DIFFUSE_LIGHT:
+		return scatter(scene.diffuseLightMaterials[material.index], ray, hit);
 #endif
 
 #if SCENE_LAMBERTIAN_MATERIALS_COUNT
-		case MATERIAL_TYPE_LAMBERTIAN: return scatter(scene.lambertianMaterials[material.index], ray, hit);
+	case MATERIAL_TYPE_LAMBERTIAN:
+		return scatter(scene.lambertianMaterials[material.index], ray, hit);
 #endif
 
 #if SCENE_METAL_MATERIALS_COUNT
-		case MATERIAL_TYPE_METAL: return scatter(scene.metalMaterials[material.index], ray, hit);
+	case MATERIAL_TYPE_METAL:
+		return scatter(scene.metalMaterials[material.index], ray, hit);
 #endif
 	}
 	return noScattering;
@@ -464,7 +472,7 @@ Scattering scatter(in const LambertianMaterial material, in const Ray ray, in co
 {
 	const Position target = hit.point + hit.normal + randomDirection();
 	return Scattering(true, colorAtTexture(material.albedo, hit.uv, hit.point),
-		Ray(Line(hit.point, target - hit.point)));
+		Ray(Line(hit.point, target - hit.point), ray.time));
 }
 
 Scattering scatter(in const MetalMaterial material, in const Ray ray, in const HitRecord hit)
@@ -479,19 +487,23 @@ Color colorAtTexture(in const Texture tex, in const UV uv, in const Position pos
 	switch (tex.type)
 	{
 #if SCENE_CHECKER_TEXTURES_COUNT
-		case TEXTURE_TYPE_CHECKER: return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_CHECKER:
+		return colorAtTexture(scene.checkerTextures[tex.index], uv, position);
 #endif
 
 #if SCENE_CONSTANT_TEXTURES_COUNT
-		case TEXTURE_TYPE_CONSTANT: return colorAtTexture(scene.constantTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_CONSTANT:
+		return colorAtTexture(scene.constantTextures[tex.index], uv, position);
 #endif
 
 #if SCENE_IMAGE_TEXTURES_COUNT
-		case TEXTURE_TYPE_IMAGE: return colorAtTexture(scene.imageTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_IMAGE:
+		return colorAtTexture(scene.imageTextures[tex.index], uv, position);
 #endif
 
 #if SCENE_NOISE_TEXTURES_COUNT
-		case TEXTURE_TYPE_NOISE: return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
+	case TEXTURE_TYPE_NOISE:
+		return colorAtTexture(scene.noiseTextures[tex.index], uv, position);
 #endif
 	}
 	return Color(1.f);

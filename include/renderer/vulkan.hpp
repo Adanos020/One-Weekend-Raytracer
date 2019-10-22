@@ -77,5 +77,11 @@ private:
     std::vector<vk::UniqueDescriptorSet> descriptor_sets;
     vk::UniquePipeline compute_pipeline;
 
+    std::pair<vk::Buffer, vma::Allocation> scene_memory;
+    std::pair<vk::Buffer, vma::Allocation> texture_images_memory;
+    std::pair<vk::Image, vma::Allocation> output_image_memory;
+
+    bool unclean = false;
+
     vk::UniqueCommandPool command_pool;
 };
